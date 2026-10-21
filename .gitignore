@@ -1,0 +1,4 @@
+docs/
+.lake/
+__pycache__/
+artifacts/

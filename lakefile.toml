@@ -1,0 +1,18 @@
+name = "keystone"
+version = "0.1.0"
+defaultTargets = ["Keystone", "keystone_gpu", "keystone_kv", "keystone_lower"]
+
+[[lean_lib]]
+name = "Keystone"
+
+[[lean_exe]]
+name = "keystone_gpu"
+root = "Keystone.CLI.GPU"
+
+[[lean_exe]]
+name = "keystone_kv"
+root = "Keystone.CLI.KV"
+
+[[lean_exe]]
+name = "keystone_lower"
+root = "Keystone.CLI.Lowering"
