@@ -34,6 +34,10 @@ structure Input where
   cache       : Array UInt32 -- store of unsigned 32-bit values
   deriving Repr, DecidableEq
 
+-- Maps from logical page to physical page
+def physicalPage (input : Input) (logical_page : Nat) : Nat :=
+  input.pageTable[logical_page]!
+
 /--
   Program counter to keep track of which
   instruction to execute for a thread
@@ -66,39 +70,47 @@ structure Machine where
   -- initially, output 0 = none and then thread 0 stores, so output 0 = some 30
   output  : Nat → Option UInt32
 
--- Program selects which kernel behaviour `step` executes
-inductive Program where
-  | gather      -- correct behaviour
-  | missingMask -- allows out-of-bounds access by skipping checks on padded threads
-  | wrongPage   -- computes logical using `%` instead of `/`
-  deriving Repr, DecidableEq
-
-inductive Space where
-  | pageTable | cache | output
-  deriving Repr, DecidableEq
-
-structure Access where
-  lane : Nat
-  space : Space
-  address : Nat
-  deriving Repr, DecidableEq
-
-inductive Fault where
-  | invalidLane (lane : Nat)
-  | outOfBounds (access : Access)
-  deriving Repr, DecidableEq
-
-/-- Every thread starts at `guard`; every output position is unwritten. -/
+/-- default/initial state of a machine
+  `threads` all are just empty `Lane`, so fresh state of each thread essentially
+  `output` is none because no thread has stored anything yet
+--/
 def init : Machine := ⟨fun _ => {}, fun _ => none⟩
 
+-- Add (thread,lane) info to a machine `m`, essentially extending the map
 def withLane (m : Machine) (tid : Nat) (l : Lane) : Machine :=
   { m with threads := fun j => if j = tid then l else m.threads j }
 
+-- Add (thread, output) info to a machine `m`
 def withOutput (m : Machine) (tid : Nat) (value : UInt32) : Machine :=
   { m with output := fun j => if j = tid then some value else m.output j }
 
-def physicalPage (input : Input) (page : Nat) : Nat :=
-  input.pageTable[page]!
+-- Specifies which buffer is accessed
+inductive Space where
+  | pageTable -- logical to physical page mapping
+  | cache     -- stored values
+  | output    -- gathered results
+  deriving Repr, DecidableEq
+
+/--
+  Records which thread accessed which cache element, where address is
+  the element index.
+  For example, { lane := 3, space := .cache, address := 1 }
+  this means thread 3 accessed cache at the element index 1
+-/
+structure Access where
+  lane      : Nat
+  space     : Space
+  address   : Nat
+  deriving Repr, DecidableEq
+
+/--
+  Fault is an invalid operation during kernel execution
+-/
+inductive Fault where
+  | invalidLane (lane : Nat)      -- execution on a wrong thread for example, or some thread not launched
+  | outOfBounds (access : Access) -- accessing an element on an index which is out of bounds
+  deriving Repr, DecidableEq
+
 
 def gatherAddress (cfg : Config) (input : Input) (tid : Nat) : Nat :=
   physicalPage input (tid / cfg.pageSize) * cfg.pageSize + tid % cfg.pageSize
@@ -110,18 +122,16 @@ def referenceAt (cfg : Config) (input : Input) (tid : Nat) : UInt32 :=
 def reference (cfg : Config) (input : Input) : Array UInt32 :=
   Array.ofFn (fun t : Fin cfg.n => referenceAt cfg input t)
 
-/-- One lane instruction, with bounds checks and access events. Mutations use
-the same interpreter. -/
-def step (program : Program) (cfg : Config) (input : Input)
+/-- One gather instruction, with bounds checks and access events. -/
+def step (cfg : Config) (input : Input)
     (tid : Nat) (m : Machine) : Except Fault (Machine × Option Access) := do
   if tid ≥ cfg.lanes then throw (.invalidLane tid)
   let l := m.threads tid
   match l.pc with
   | .guard =>
-    let active := program == .missingMask || tid < cfg.n
-    return (withLane m tid { l with pc := if active then .index else .done }, none)
+    return (withLane m tid { l with pc := if tid < cfg.n then .index else .done }, none)
   | .index =>
-    let page := if program == .wrongPage then tid % cfg.pageSize else tid / cfg.pageSize
+    let page := tid / cfg.pageSize
     return (withLane m tid { l with pc := .table, page := page }, none)
   | .table =>
     let a : Access := ⟨tid, .pageTable, l.page⟩
@@ -143,12 +153,12 @@ def step (program : Program) (cfg : Config) (input : Input)
   | .done => return (m, none)
 
 /-- Replay a supplied interleaving; the schedule need not be fair or complete. -/
-def run (program : Program) (cfg : Config) (input : Input) :
+def run (cfg : Config) (input : Input) :
     List Nat → Machine → Except Fault (Machine × List Access)
   | [], m => .ok (m, [])
   | tid :: schedule, m => do
-    let (next, access) ← step program cfg input tid m
-    let (last, accesses) ← run program cfg input schedule next
+    let (next, access) ← step cfg input tid m
+    let (last, accesses) ← run cfg input schedule next
     return (last, access.toList ++ accesses)
 
 /-- Give each lane six turns, enough to reach `done` from `guard`. -/
