@@ -25,7 +25,7 @@ private def word (json : Json) : Except String UInt32 := do
 
 def handle (json : Json) : Except String Json := do
   Keystone.CLI.object json ["page_size", "tokens", "block_size", "table", "cache"]
-    ["schedule", "mutation"]
+    ["schedule"]
   let pageSize ← Keystone.CLI.nat json "page_size"
   let n ← Keystone.CLI.nat json "tokens"
   let blockSize ← Keystone.CLI.nat json "block_size"
@@ -39,14 +39,6 @@ def handle (json : Json) : Except String Json := do
   let cfg : Config := ⟨n, pageSize, lanes⟩
   let input : Input := ⟨← table.mapM Json.getNat?, ← cache.mapM word⟩
   unless validateInput cfg input do throw "invalid gather contract (coverage or physical-page bounds)"
-  let mutation ← match Keystone.CLI.optional json "mutation" with
-    | none => pure "none"
-    | some value => value.getStr?
-  let program ← match mutation with
-    | "none" => pure Program.gather
-    | "missing_mask" => pure Program.missingMask
-    | "wrong_page" => pure Program.wrongPage
-    | _ => throw "unknown kernel mutation"
   let schedule ← match Keystone.CLI.optional json "schedule" with
     | none => pure (roundRobin cfg)
     | some value => do
@@ -54,9 +46,8 @@ def handle (json : Json) : Except String Json := do
       if entries.size > 32768 then throw "schedule exceeds model runner limit (32768 steps)"
       pure (← entries.toList.mapM Json.getNat?)
   let common := [("lanes", toJson lanes), ("steps", toJson schedule.length),
-    ("reference", toJson ((reference cfg input).map UInt32.toNat)),
-    ("mutation", toJson mutation)]
-  match run program cfg input schedule init with
+    ("reference", toJson ((reference cfg input).map UInt32.toNat))]
+  match run cfg input schedule init with
   | .error fault => return Json.mkObj (common ++ [
       ("status", toJson "fault"), ("fault", faultJson fault)])
   | .ok (machine, accesses) => return Json.mkObj (common ++ [

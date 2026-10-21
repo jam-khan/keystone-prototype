@@ -64,10 +64,10 @@ class GatherCase:
     def launched_threads(self) -> int:
         return ((self.tokens + self.block_size - 1) // self.block_size) * self.block_size
 
-    def request(self, schedule=None, mutation: str = "none") -> dict:
+    def request(self, schedule=None) -> dict:
         result = {"page_size": self.page_size, "tokens": self.tokens,
                   "block_size": self.block_size, "table": list(self.table),
-                  "cache": list(self.cache), "mutation": mutation}
+                  "cache": list(self.cache)}
         if schedule is not None:
             result["schedule"] = list(schedule)
         return result
@@ -85,8 +85,8 @@ class LeanGather:
     def __init__(self, executable: Path = ROOT / ".lake/build/bin/keystone_gpu") -> None:
         self.executable = Path(executable).resolve()
 
-    def run(self, case: GatherCase, schedule=None, mutation: str = "none") -> dict:
-        response = subprocess.run([str(self.executable)], input=json.dumps(case.request(schedule, mutation)),
+    def run(self, case: GatherCase, schedule=None) -> dict:
+        response = subprocess.run([str(self.executable)], input=json.dumps(case.request(schedule)),
                                   capture_output=True, text=True, check=True, timeout=30)
         result = json.loads(response.stdout)
         if not isinstance(result, dict):
@@ -107,14 +107,3 @@ def cases(seed: int = 2026, count: int = 0):
         table = tuple(rng.randrange(pages) for _ in range((tokens + page_size - 1) // page_size))
         cache = tuple(rng.getrandbits(32) for _ in range(pages * page_size))
         yield GatherCase(page_size, tokens, rng.choice((1, 4, 8, 32)), table, cache)
-
-
-def mutation_cases() -> dict[str, GatherCase]:
-    """Faults are interpreted in Lean, never executed as unsafe native code.
-
-    The wrong-page example stays in bounds but computes the wrong values;
-    memory safety alone therefore cannot establish functional correctness.
-    """
-    return {"missing_mask": GatherCase(4, 5, 4, (2, 0), tuple(range(12))),
-            "wrong_page": GatherCase(2, 4, 4, (1, 0), (10, 11, 20, 21))}
-

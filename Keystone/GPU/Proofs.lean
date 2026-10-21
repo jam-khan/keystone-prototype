@@ -69,7 +69,7 @@ def EventSafe (cfg : Config) (input : Input) : Option Access → Prop
 /-- A launched lane steps without faults and preserves the invariant. -/
 theorem step_safe (hvalid : ValidInput cfg input) (hinv : Invariant cfg input m)
     (ht : tid < cfg.lanes) :
-    ∃ next access, step .gather cfg input tid m = .ok (next, access) ∧
+    ∃ next access, step cfg input tid m = .ok (next, access) ∧
       Invariant cfg input next ∧ EventSafe cfg input access := by
   have hi := (hinv tid).1
   have ho := (hinv tid).2
@@ -141,7 +141,7 @@ theorem step_safe (hvalid : ValidInput cfg input) (hinv : Invariant cfg input m)
 /-- Any finite schedule of launched lanes is safe; completion is separate. -/
 theorem run_safe (hvalid : ValidInput cfg input) (hinv : Invariant cfg input m)
     (hschedule : ∀ tid ∈ schedule, tid < cfg.lanes) :
-    ∃ last accesses, run .gather cfg input schedule m = .ok (last, accesses) ∧
+    ∃ last accesses, run cfg input schedule m = .ok (last, accesses) ∧
       Invariant cfg input last ∧ ∀ a ∈ accesses, AccessSafe cfg input a := by
   induction schedule generalizing m with
   | nil => exact ⟨m, [], rfl, hinv, by simp⟩
@@ -152,7 +152,7 @@ theorem run_safe (hvalid : ValidInput cfg input) (hinv : Invariant cfg input m)
       ih hnext (fun j hj => hschedule j (by simp [hj]))
     refine ⟨last, access.toList ++ accesses, ?_, hlast, ?_⟩
     · simp only [run, hstep]
-      change (do let (last, accesses) ← run .gather cfg input schedule next
+      change (do let (last, accesses) ← run cfg input schedule next
                  pure (last, access.toList ++ accesses)) = _
       rw [hrun]
       rfl
@@ -181,7 +181,7 @@ theorem finished_correct (hvalid : ValidInput cfg input)
 /-- Completed executions match the sequential gather. -/
 theorem completed_execution_correct (hvalid : ValidInput cfg input)
     (hschedule : ∀ tid ∈ schedule, tid < cfg.lanes)
-    (hrun : run .gather cfg input schedule init = .ok (last, accesses))
+    (hrun : run cfg input schedule init = .ok (last, accesses))
     (hdone : completed cfg last = true) :
     (∀ tid, tid < cfg.n → last.output tid = some (referenceAt cfg input tid)) ∧
     (∀ a ∈ accesses, AccessSafe cfg input a) := by

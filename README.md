@@ -48,10 +48,11 @@ For token `t`, page size `B`, and page table `P`:
 out[t] = cache[P[t / B] * B + t % B]    if t < token_count
 ```
 
-The GPU model exposes masking and indexing errors. The KV model exposes a different
-failure: a perfectly in-bounds kernel can read another request's data if a page is
-reused too early. The compiler proves that translating a structured program to
-flat instructions preserves outputs, access traces, faults, and stack frames.
+The GPU model implements one gather kernel, with explicit masking and indexing.
+The KV model exposes a different failure: an in-bounds kernel can read another
+request's data if a page is reused too early. The compiler proves that translating
+a structured program to flat instructions preserves outputs, access traces,
+faults, and stack frames.
 
 All native demos share one path:
 
@@ -68,6 +69,16 @@ connects live KV leases to the lowered gather.
 - Change the page table in `kernel_demo`; predict the output before running it.
 - Change the completion order in `lifetime_demo`; check when reuse becomes possible.
 - Read the compiler, then add a source operation and work through its proof case.
+
+## Mutation experiments
+
+[tests/Mutations.lean](tests/Mutations.lean) changes copies of kernel syntax or
+compiled instructions. The interpreters and gather specification stay fixed;
+there are no mutation modes in the model or runners. `make test` checks concrete
+counterexamples for missing guards, wrong indices, and broken predicate restoration.
+A correct compiler preserves a source bug; it does not make that kernel correct.
+Mutated target instructions are outside the compiler theorem's conclusion.
+Run these examples alone with `lake env lean tests/Mutations.lean`.
 
 ## Proof boundary
 

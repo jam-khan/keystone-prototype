@@ -32,10 +32,6 @@ structure Machine where
   threads : Nat → Lane
   output : Nat → Option UInt32
 
-inductive Program where
-  | gather | missingMask | wrongPage
-  deriving Repr, DecidableEq
-
 inductive Space where
   | pageTable | cache | output
   deriving Repr, DecidableEq
@@ -71,18 +67,16 @@ def referenceAt (cfg : Config) (input : Input) (tid : Nat) : UInt32 :=
 def reference (cfg : Config) (input : Input) : Array UInt32 :=
   Array.ofFn (fun t : Fin cfg.n => referenceAt cfg input t)
 
-/-- One lane instruction, with bounds checks and access events. Mutations use
-the same interpreter. -/
-def step (program : Program) (cfg : Config) (input : Input)
+/-- One gather instruction, with bounds checks and access events. -/
+def step (cfg : Config) (input : Input)
     (tid : Nat) (m : Machine) : Except Fault (Machine × Option Access) := do
   if tid ≥ cfg.lanes then throw (.invalidLane tid)
   let l := m.threads tid
   match l.pc with
   | .guard =>
-    let active := program == .missingMask || tid < cfg.n
-    return (withLane m tid { l with pc := if active then .index else .done }, none)
+    return (withLane m tid { l with pc := if tid < cfg.n then .index else .done }, none)
   | .index =>
-    let page := if program == .wrongPage then tid % cfg.pageSize else tid / cfg.pageSize
+    let page := tid / cfg.pageSize
     return (withLane m tid { l with pc := .table, page := page }, none)
   | .table =>
     let a : Access := ⟨tid, .pageTable, l.page⟩
@@ -104,12 +98,12 @@ def step (program : Program) (cfg : Config) (input : Input)
   | .done => return (m, none)
 
 /-- Replay a supplied interleaving; the schedule need not be fair or complete. -/
-def run (program : Program) (cfg : Config) (input : Input) :
+def run (cfg : Config) (input : Input) :
     List Nat → Machine → Except Fault (Machine × List Access)
   | [], m => .ok (m, [])
   | tid :: schedule, m => do
-    let (next, access) ← step program cfg input tid m
-    let (last, accesses) ← run program cfg input schedule next
+    let (next, access) ← step cfg input tid m
+    let (last, accesses) ← run cfg input schedule next
     return (last, access.toList ++ accesses)
 
 def roundRobin (cfg : Config) : List Nat :=

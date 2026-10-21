@@ -103,16 +103,8 @@ private def launch (execute : Context → State → Result State)
   (List.range lanes).foldlM (fun state lane =>
     execute { ctx with lane := UInt64.ofNat lane } { state with locals := fun _ => 0 }) {}
 
-private def mutate (name : String) (code : List Instr) : Except String (List Instr) :=
-  match name with
-  | "none" => .ok code
-  | "drop_masks" => .ok (code.filter fun i => i != .enterMask && i != .leaveMask)
-  | "drop_restore" => .ok (code.filter fun i => i != .leaveMask)
-  | "wrong_division" => .ok (code.map fun i => if i == .bin .div then .bin .mod else i)
-  | _ => .error "unknown lowering mutation"
-
 def handle (json : Json) : Except String Json := do
-  Keystone.CLI.object json ["page_size", "tokens", "lanes", "table", "cache"] ["source", "mutation"]
+  Keystone.CLI.object json ["page_size", "tokens", "lanes", "table", "cache"] ["source"]
   let pageSize ← word (← Keystone.CLI.field json "page_size")
   let tokens ← Keystone.CLI.nat json "tokens"
   let lanes ← Keystone.CLI.nat json "lanes"
@@ -128,22 +120,17 @@ def handle (json : Json) : Except String Json := do
   let program ← match Keystone.CLI.optional json "source" with
     | none => pure gather
     | some value => command 64 value
-  let original := compile program
-  if original.length > 4096 then throw "lowered program exceeds instruction limit"
-  let mutation ← match Keystone.CLI.optional json "mutation" with
-    | none => pure "none"
-    | some value => value.getStr?
-  let code ← mutate mutation original
+  let code := compile program
+  if code.length > 4096 then throw "lowered program exceeds instruction limit"
   let isGather := (Keystone.CLI.optional json "source").isNone
   let contract := Keystone.GPU.validateInput ⟨tokens, pageSize.toNat, lanes⟩
     ⟨ctx.table.map UInt64.toNat, ctx.cache⟩
   let sourceResult := resultJson tokens (launch (source program) ctx lanes)
   let targetResult := resultJson tokens (launch (fun ctx state =>
     (target code ctx ⟨state, [], true, []⟩).map Target.state) ctx lanes)
-  return Json.mkObj [("status", toJson "ok"), ("mutation", toJson mutation),
+  return Json.mkObj [("status", toJson "ok"),
     ("program", toJson (if isGather then "gather" else "custom")),
     ("gather_contract", toJson (isGather && contract)),
-    ("lowering_theorem_applies", toJson (mutation == "none")),
     ("observable_equivalent", toJson (sourceResult == targetResult)),
     ("source", sourceResult), ("target", targetResult),
     ("instructions", programJson code), ("listing", toJson (emitListing code)),

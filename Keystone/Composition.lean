@@ -43,7 +43,7 @@ theorem pending_gather_correct (hs : KV.Valid s) (ht : ticket ∈ s.pending)
     (hcoverage : cfg.n ≤ ticket.pages.length * cfg.pageSize)
     (hcache : cache.size = s.capacity * cfg.pageSize) :
     ∃ last accesses,
-      GPU.run .gather cfg (ticketInput ticket cache) (GPU.roundRobin cfg) GPU.init =
+      GPU.run cfg (ticketInput ticket cache) (GPU.roundRobin cfg) GPU.init =
         .ok (last, accesses) ∧
       GPU.completed cfg last = true ∧
       (∀ t, t < cfg.n → last.output t =

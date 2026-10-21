@@ -16,7 +16,7 @@ def PC.remaining : PC → Nat
   cases pc <;> simp [PC.remaining]
 
 private theorem step_remaining (ht : tid < cfg.lanes)
-    (hs : step .gather cfg input tid m = .ok (next, access)) (j : Nat) :
+    (hs : step cfg input tid m = .ok (next, access)) (j : Nat) :
     (next.threads j).pc.remaining ≤
       (m.threads j).pc.remaining - if j = tid then 1 else 0 := by
   cases hp : (m.threads tid).pc <;>
@@ -27,7 +27,7 @@ private theorem step_remaining (ht : tid < cfg.lanes)
 
 /-- Each scheduled instruction reduces its lane’s remaining work; done lanes stutter. -/
 theorem run_remaining (hschedule : ∀ t ∈ schedule, t < cfg.lanes)
-    (hrun : run .gather cfg input schedule m = .ok (last, accesses)) (j : Nat) :
+    (hrun : run cfg input schedule m = .ok (last, accesses)) (j : Nat) :
     (last.threads j).pc.remaining ≤
       (m.threads j).pc.remaining - schedule.count j := by
   induction schedule generalizing m accesses with
@@ -36,16 +36,16 @@ theorem run_remaining (hschedule : ∀ t ∈ schedule, t < cfg.lanes)
     simp
   | cons tid schedule ih =>
     have ht : tid < cfg.lanes := hschedule tid (by simp)
-    cases hs : step .gather cfg input tid m with
+    cases hs : step cfg input tid m with
     | error e =>
       simp [run, hs] at hrun
       cases hrun
     | ok pair =>
       obtain ⟨next, access⟩ := pair
       simp only [run, hs] at hrun
-      change (do let v ← run .gather cfg input schedule next
+      change (do let v ← run cfg input schedule next
                  pure (v.1, access.toList ++ v.2)) = Except.ok (last, accesses) at hrun
-      cases hr : run .gather cfg input schedule next with
+      cases hr : run cfg input schedule next with
       | error e =>
         simp [hr] at hrun
         cases hrun
@@ -64,7 +64,7 @@ theorem run_remaining (hschedule : ∀ t ∈ schedule, t < cfg.lanes)
           omega
 
 theorem sufficiently_scheduled_finishes (hschedule : ∀ t ∈ schedule, t < cfg.lanes)
-    (hrun : run .gather cfg input schedule init = .ok (last, accesses))
+    (hrun : run cfg input schedule init = .ok (last, accesses))
     (hcount : ∀ t, t < cfg.lanes → 6 ≤ schedule.count t) : Finished cfg last := by
   intro t ht
   have hr := run_remaining hschedule hrun t
@@ -81,7 +81,7 @@ private theorem roundRobin_count (ht : tid < cfg.lanes) :
 
 /-- Six complete rounds finish every lane without a fairness assumption. -/
 theorem roundRobin_finishes
-    (hrun : run .gather cfg input (roundRobin cfg) init = .ok (last, accesses)) :
+    (hrun : run cfg input (roundRobin cfg) init = .ok (last, accesses)) :
     completed cfg last = true := by
   apply completed_eq_true.mpr
   apply sufficiently_scheduled_finishes roundRobin_valid hrun
@@ -90,7 +90,7 @@ theorem roundRobin_finishes
 
 theorem verified_roundRobin (hvalid : ValidInput cfg input) :
     ∃ last accesses,
-      run .gather cfg input (roundRobin cfg) init = .ok (last, accesses) ∧
+      run cfg input (roundRobin cfg) init = .ok (last, accesses) ∧
       completed cfg last = true ∧
       (∀ t, t < cfg.n → last.output t = some (referenceAt cfg input t)) ∧
       (∀ a ∈ accesses, AccessSafe cfg input a) := by

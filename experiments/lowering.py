@@ -42,9 +42,8 @@ class LoweredNative:
     def __init__(self, response: dict, cuda: bool = False,
                  directory: Path = ROOT / "artifacts/native") -> None:
         self.cuda = cuda
-        if cuda and (response.get("program") != "gather" or response.get("mutation") != "none"
-                     or not response.get("gather_contract")):
-            raise ValueError("CUDA runner requires an unmutated gather with a valid memory contract")
+        if cuda and (response.get("program") != "gather" or not response.get("gather_contract")):
+            raise ValueError("CUDA runner requires the gather kernel with a valid memory contract")
         compiler = shutil.which("nvcc" if cuda else "cc")
         if compiler is None:
             raise BackendUnavailable("nvcc is unavailable" if cuda else "cc is unavailable")
@@ -99,8 +98,8 @@ class LoweredNative:
         if self.cuda:
             # The generic theorem is per lane. Restrict parallel native launches
             # to the proved gather specialization: successful, disjoint writes.
-            if "source" in request or request.get("mutation", "none") != "none" or lanes < n:
-                raise ValueError("CUDA runner accepts only complete unmutated gather launches")
+            if "source" in request or lanes < n:
+                raise ValueError("CUDA runner accepts only complete gather launches")
             GatherCase(b, n, 1, table, cache)
         cache_buffer = (ctypes.c_uint32 * len(cache))(*cache)
         table_buffer = (ctypes.c_uint64 * len(table))(*table)

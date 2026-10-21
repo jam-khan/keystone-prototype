@@ -4,6 +4,7 @@ build:
 	lake build --wfail
 
 test: build
+	lake env lean tests/Mutations.lean
 	python3 -m unittest discover -s tests -v
 
 audit: build

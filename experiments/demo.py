@@ -2,7 +2,7 @@
 
 import argparse
 
-from experiments.gather import GatherCase, LeanGather, mutation_cases, reference
+from experiments.gather import GatherCase, LeanGather, reference
 from experiments.lowering import CudaGather, NativeGather
 from experiments.runtime import Controller, PendingGather
 
@@ -14,14 +14,6 @@ def kernel_demo(native, lean):
     assert model["status"] == "completed"
     assert actual == model["output"] == reference(case)
     print("Gather:", model["output"], "(5 active lanes, 3 padded)")
-    for name, case in mutation_cases().items():
-        result = lean.run(case, mutation=name)
-        if name == "missing_mask":
-            assert result["status"] == "fault"
-            print("Missing mask:", result["fault"])
-        else:
-            assert result["status"] == "completed" and result["output"] != result["reference"]
-            print("Wrong page:", result["output"], "expected", result["reference"])
 
 
 def lifetime_demo(native):

@@ -4,7 +4,7 @@ import random
 import tempfile
 import unittest
 
-from experiments.gather import GatherCase, LeanGather, cases, mutation_cases, reference
+from experiments.gather import GatherCase, LeanGather, cases, reference
 from experiments.lowering import NativeGather
 
 
@@ -48,16 +48,6 @@ class GPUTests(unittest.TestCase):
         self.assertEqual(result["output"], [10, None, None])
         self.assertEqual(self.lean.run(case, schedule=[4])["fault"],
                          {"kind": "invalid_lane", "lane": 4})
-
-    def test_missing_mask_and_wrong_page(self):
-        fixtures = mutation_cases()
-        missing = self.lean.run(fixtures["missing_mask"], mutation="missing_mask")
-        self.assertEqual(missing["status"], "fault")
-        self.assertEqual(missing["fault"]["access"]["space"], "output")
-        wrong = self.lean.run(fixtures["wrong_page"], mutation="wrong_page")
-        self.assertEqual(wrong["status"], "completed")
-        self.assertEqual(wrong["output"], [20, 11, 20, 11])
-        self.assertNotEqual(wrong["output"], reference(fixtures["wrong_page"]))
 
     def test_native_launch_contract(self):
         base = dict(page_size=2, tokens=3, block_size=4, table=(0, 1), cache=(10, 11, 20, 21))
