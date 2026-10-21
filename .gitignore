@@ -1,0 +1,5 @@
+docs/
+.lake/
+artifacts/
+__pycache__/
+.DS_Store
