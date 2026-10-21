@@ -70,7 +70,7 @@ structure Machine where
 inductive Program where
   | gather      -- correct behaviour
   | missingMask -- allows out-of-bounds access by skipping checks on padded threads
-  | wrongPage   -- 
+  | wrongPage   -- computes logical using `%` instead of `/`
   deriving Repr, DecidableEq
 
 inductive Space where
