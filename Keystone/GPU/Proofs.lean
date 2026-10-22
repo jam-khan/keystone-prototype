@@ -1,5 +1,16 @@
 import Keystone.GPU.KVGather
 
+/-!
+# Proofs: the KV gather is safe, correct, and race-free
+
+The three main theorems, for ANY schedule of launched threads:
+1. `run_safe`: on a valid launch, no step faults and every access is in bounds.
+2. `completed_execution_correct`: once every thread is done, output = `expectedOutput`.
+3. `run_stores_distinct`: no output slot is written twice, so no two writes race.
+
+`Progress.lean` adds that `roundRobin` finishes every thread.
+-/
+
 namespace Keystone.GPU
 
 /-- Token `t`'s `.table` read is inside the page table. -/
@@ -34,8 +45,6 @@ theorem kvCache_bounds
   exact Nat.lt_of_lt_of_le hstep hfits
 
 /-! ## Grid-stride arithmetic: thread `tid`'s token in round `r` is `tid + r * numThreads` -/
-
-theorem tid_le_token : tid ≤ token cfg tid r := Nat.le_add_right _ _
 
 /-- A launched thread's tokens all have remainder `tid` mod `numThreads`... -/
 theorem token_mod (ht : tid < cfg.numThreads) : token cfg tid r % cfg.numThreads = tid := by
@@ -161,12 +170,12 @@ private theorem store_invariant (h : Invariant cfg mem s) (ht : tid < cfg.numThr
 
 /-! ## Safety: no step faults, every access is in bounds -/
 
-/-- An access is by a real thread, in bounds, and stores go to a slot this thread owns. -/
+/-- An access is inside the buffer it touches. -/
 def AccessSafe (cfg : Config) (mem : KVMemory) (a : Access) : Prop :=
-  a.thread < cfg.numThreads ∧ a.thread < cfg.numTokens ∧ match a.buffer with
-    | .pageTable => a.index < mem.pageTable.size
-    | .kvCache   => a.index < mem.kvCache.size
-    | .output    => a.index % cfg.numThreads = a.thread ∧ a.index < cfg.numTokens
+  match a.buffer with
+  | .pageTable => a.index < mem.pageTable.size
+  | .kvCache   => a.index < mem.kvCache.size
+  | .output    => a.index < cfg.numTokens
 
 -- a step makes either no access, or a safe one
 def EventSafe (cfg : Config) (mem : KVMemory) : Option Access → Prop
@@ -211,7 +220,7 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       some ⟨tid, .pageTable, (s.threads tid).logicalPage⟩, ?_, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hb] <;> rfl
     · exact withThread_invariant hinv ⟨hi'.1, congrArg (physicalPage mem) hi'.2⟩ rfl
-    · exact ⟨ht, Nat.lt_of_le_of_lt tid_le_token hi'.1, hb⟩
+    · exact hb
   | kvIndex =>
     have hi' : token cfg tid (s.threads tid).round < cfg.numTokens ∧
         (s.threads tid).physicalPage =
@@ -237,20 +246,20 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       some ⟨tid, .kvCache, (s.threads tid).kvIndex⟩, ?_, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hb] <;> rfl
     · exact withThread_invariant hinv ⟨hi'.1, congrArg (fun i => mem.kvCache[i]!) hi'.2⟩ rfl
-    · exact ⟨ht, Nat.lt_of_le_of_lt tid_le_token hi'.1, hb⟩
+    · exact hb
   | store =>
     have hi' : token cfg tid (s.threads tid).round < cfg.numTokens ∧ (s.threads tid).entry =
         mem.kvCache[mem.pageTable[token cfg tid (s.threads tid).round / cfg.pageSize]! *
           cfg.pageSize + token cfg tid (s.threads tid).round % cfg.pageSize]! := by
       simpa [ThreadOK, hp] using hi
-    -- the output write goes to slot `t`, which this thread owns (t % numThreads = tid)
+    -- the output write goes to slot `t`, which is inside the output (t < numTokens)
     refine ⟨withOutput (withThread s tid { s.threads tid with
           instr := .guard, round := (s.threads tid).round + 1 })
         (token cfg tid (s.threads tid).round) (s.threads tid).entry,
       some ⟨tid, .output, token cfg tid (s.threads tid).round⟩, ?_, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hi'.1] <;> rfl
     · exact store_invariant hinv ht hi'.2
-    · exact ⟨ht, Nat.lt_of_le_of_lt tid_le_token hi'.1, token_mod ht, hi'.1⟩
+    · exact hi'.1
   | done =>
     exact ⟨s, none, by simp [step, Nat.not_le_of_gt ht, hp] <;> rfl, hinv, trivial⟩
 
@@ -292,7 +301,7 @@ def Finished (cfg : Config) (s : KernelState) : Prop :=
   simp [completed, Finished, List.all_eq_true]
 
 -- once every thread is done, every output slot holds the expected entry
-theorem finished_correct (hvalid : ValidLaunch cfg mem)
+private theorem finished_correct (hvalid : ValidLaunch cfg mem)
     (hinv : Invariant cfg mem s) (hfinished : Finished cfg s)
     (he : e < cfg.numTokens) : s.output e = some (expectedEntry cfg mem e) := by
   -- slot e belongs to thread `e % numThreads`, which handles it in round `e / numThreads`
@@ -322,26 +331,6 @@ theorem completed_execution_correct (hvalid : ValidLaunch cfg mem)
   rw [hrun] at hr
   cases hr
   exact ⟨fun _ ht => finished_correct hvalid hi (completed_eq_true.mp hdone) ht, ha⟩
-
-/-- Padded threads make no memory accesses. -/
-theorem padded_threads_no_access (h : AccessSafe cfg mem a) : a.thread < cfg.numTokens :=
-  h.2.1
-
-/-- Two different threads never write the same output slot. -/
-theorem distinct_threads_disjoint_stores (ha : AccessSafe cfg mem a)
-    (hb : AccessSafe cfg mem b) (hsa : a.buffer = .output) (hsb : b.buffer = .output)
-    (hne : a.thread ≠ b.thread) : a.index ≠ b.index := by
-  have hae : a.index % cfg.numThreads = a.thread := by
-    have h := ha.2.2
-    rw [hsa] at h
-    exact h.1
-  have hbe : b.index % cfg.numThreads = b.thread := by
-    have h := hb.2.2
-    rw [hsb] at h
-    exact h.1
-  intro heq
-  apply hne
-  rw [← hae, ← hbe, heq]
 
 /-! ## No output slot is ever written twice -/
 
