@@ -52,11 +52,11 @@ theorem compile_inactive (command : Cmd) (ctx : Context) (state : State)
     simp [compile, target_append, ihf, ihs, Except.bind]
   | set id value =>
     simp [compile, target_append, compileExpr_inactive, Except.bind, target, targetStep]
-  | loadTable id address =>
+  | loadPageTable id index =>
     simp [compile, target_append, compileExpr_inactive, Except.bind, target, targetStep]
-  | loadCache id address =>
+  | loadKVCache id index =>
     simp [compile, target_append, compileExpr_inactive, Except.bind, target, targetStep]
-  | store address value =>
+  | store index value =>
     simp [compile, target_append, compileExpr_inactive, Except.bind, target, targetStep]
   | whenLt lhs rhs body ih =>
     simp [compile, target_append, compileExpr_inactive, Except.bind, target, targetStep, ih]
@@ -74,17 +74,17 @@ theorem compile_correct (command : Cmd) (ctx : Context) (state : State)
     cases hf : source first ctx state <;> simp [Except.bind, Except.map, ihs]
   | set id value =>
     simp [compile, target_append, compileExpr_correct, Except.bind, target, targetStep, source, Except.map]
-  | loadTable id address =>
+  | loadPageTable id index =>
     simp only [compile, target_append, compileExpr_correct, Except.bind]
-    cases hr : readTable ctx state (address.eval ctx state) <;>
+    cases hr : readPageTable ctx state (index.eval ctx state) <;>
       simp_all [Except.bind, target, targetStep, source, Except.map]
-  | loadCache id address =>
+  | loadKVCache id index =>
     simp only [compile, target_append, compileExpr_correct, Except.bind]
-    cases hr : readCache ctx state (address.eval ctx state) <;>
+    cases hr : readKVCache ctx state (index.eval ctx state) <;>
       simp_all [Except.bind, target, targetStep, source, Except.map]
-  | store address value =>
+  | store index value =>
     simp only [compile, target_append, compileExpr_correct, Except.bind]
-    cases hr : writeOutput ctx state (address.eval ctx state) (value.eval ctx state) <;>
+    cases hr : writeOutput ctx state (index.eval ctx state) (value.eval ctx state) <;>
       simp_all [Except.bind, target, targetStep, source, Except.map]
   | whenLt lhs rhs body ih =>
     simp only [compile, target_append, compileExpr_correct, Except.bind]
@@ -129,19 +129,19 @@ theorem source_fault_is_memory
     | ok next =>
       rw [hs] at failure
       exact ihs failure
-  | loadTable id address =>
-    simp only [source, readTable] at failure
+  | loadPageTable id index =>
+    simp only [source, readPageTable] at failure
     split at failure <;> simp only [Except.map] at failure
     · cases failure
     · cases failure
       trivial
-  | loadCache id address =>
-    simp only [source, readCache] at failure
+  | loadKVCache id index =>
+    simp only [source, readKVCache] at failure
     split at failure <;> simp only [Except.map] at failure
     · cases failure
     · cases failure
       trivial
-  | store address value =>
+  | store index value =>
     simp only [source, writeOutput] at failure
     split at failure
     · cases failure

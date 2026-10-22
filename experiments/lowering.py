@@ -14,15 +14,16 @@ import subprocess
 import tempfile
 
 from experiments.gather import (GatherCase, ROOT, SIZE_MAX,
-                                UINT32_MAX, UINT64_MAX, cases, reference)
+                                UINT32_MAX, UINT64_MAX, cases, expected_output)
 
 
 EXECUTABLE = ROOT / ".lake/build/bin/keystone_lower"
 
 
 def request_for(case) -> dict:
-    return {"page_size": case.page_size, "tokens": case.tokens,
-            "lanes": case.launched_threads, "table": list(case.table), "cache": list(case.cache)}
+    return {"page_size": case.page_size, "num_tokens": case.num_tokens,
+            "num_threads": case.num_threads, "page_table": list(case.page_table),
+            "kv_cache": list(case.kv_cache)}
 
 
 def lower(request: dict) -> dict:
@@ -88,24 +89,24 @@ class LoweredNative:
                 raise ValueError("native launch contains an invalid integer")
             return value
 
-        cache = tuple(bounded(v, UINT32_MAX) for v in request["cache"])
-        table = tuple(bounded(v, UINT64_MAX) for v in request["table"])
-        if len(cache) > SIZE_MAX // 4 or len(table) > SIZE_MAX // 8:
+        kv_cache = tuple(bounded(v, UINT32_MAX) for v in request["kv_cache"])
+        page_table = tuple(bounded(v, UINT64_MAX) for v in request["page_table"])
+        if len(kv_cache) > SIZE_MAX // 4 or len(page_table) > SIZE_MAX // 8:
             raise ValueError("native allocation exceeds addressable memory")
-        n = bounded(request["tokens"], min(UINT64_MAX, SIZE_MAX // 4))
-        b = bounded(request["page_size"], UINT64_MAX)
-        lanes = bounded(request["lanes"], UINT64_MAX)
+        num_tokens = bounded(request["num_tokens"], min(UINT64_MAX, SIZE_MAX // 4))
+        page_size = bounded(request["page_size"], UINT64_MAX)
+        num_threads = bounded(request["num_threads"], UINT64_MAX)
         if self.cuda:
-            # The generic theorem is per lane. Restrict parallel native launches
+            # The generic theorem is per thread. Restrict parallel native launches
             # to the proved gather specialization: successful, disjoint writes.
-            if "source" in request or lanes < n:
+            if "source" in request or num_threads < num_tokens:
                 raise ValueError("CUDA runner accepts only complete gather launches")
-            GatherCase(b, n, 1, table, cache)
-        cache_buffer = (ctypes.c_uint32 * len(cache))(*cache)
-        table_buffer = (ctypes.c_uint64 * len(table))(*table)
-        output = (ctypes.c_uint32 * n)()
-        status = self.kernel(cache_buffer, len(cache), table_buffer, len(table), output,
-                             n, b, n, lanes)
+            GatherCase(page_size, num_tokens, 1, page_table, kv_cache)
+        kv_cache_buffer = (ctypes.c_uint32 * len(kv_cache))(*kv_cache)
+        page_table_buffer = (ctypes.c_uint64 * len(page_table))(*page_table)
+        output = (ctypes.c_uint32 * num_tokens)()
+        status = self.kernel(kv_cache_buffer, len(kv_cache), page_table_buffer, len(page_table),
+                             output, num_tokens, page_size, num_tokens, num_threads)
         if status:
             raise RuntimeError(f"lowered native program rejected execution (status={status})")
         return list(output)
@@ -149,18 +150,18 @@ def main() -> None:
         if native is None:
             native = LoweredNative(result, cuda=args.cuda)
         actual = native.run(request)
-        expected = reference(case)
+        expected = expected_output(case)
         if (not result["observable_equivalent"] or result["source"]["status"] != "ok" or
                 result["target"]["status"] != "ok" or
                 actual != result["target"]["output"] or actual != expected):
             raise AssertionError(f"lowering disagreement: {request} -> {result}")
         records.append({"request": request, "source": result["source"], "target": result["target"],
-                        "native": actual, "reference": expected})
+                        "native": actual, "expected_output": expected})
     if args.output:
         args.output.write_text(json.dumps({"backend": native.metadata,
             "instructions": result["instructions"], "cases": records}, indent=2) + "\n")
     print(f"Lowering: {len(result['instructions'])} target instructions; "
-          f"{len(records)} source/target/native/reference cases agree ({native.metadata['backend']}).")
+          f"{len(records)} source/target/native/expected cases agree ({native.metadata['backend']}).")
 
 
 if __name__ == "__main__":

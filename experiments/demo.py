@@ -2,7 +2,7 @@
 
 import argparse
 
-from experiments.gather import GatherCase, LeanGather, reference
+from experiments.gather import GatherCase, LeanGather, expected_output
 from experiments.lowering import CudaGather, NativeGather
 from experiments.runtime import Controller, PendingGather
 
@@ -12,22 +12,22 @@ def kernel_demo(native, lean):
     model = lean.run(case)
     actual = native.run(case)
     assert model["status"] == "completed"
-    assert actual == model["output"] == reference(case)
-    print("Gather:", model["output"], "(5 active lanes, 3 padded)")
+    assert actual == model["output"] == expected_output(case)
+    print("Gather:", model["output"], "(5 real threads, 3 padded)")
 
 
 def lifetime_demo(native):
     controller = Controller(capacity=1)
     a = controller.command("allocate", owner=10)["lease"]
-    cache = [101, 102, 103, 104]  # Fill once; keep read-only until completion.
+    kv_cache = [101, 102, 103, 104]  # Fill once; keep read-only until completion.
     tickets = [controller.command("submit", owner=10, pages=[a])["ticket"] for _ in range(2)]
-    jobs = [PendingGather.from_ticket(ticket, tokens=3) for ticket in tickets]
+    jobs = [PendingGather.from_ticket(ticket, num_tokens=3) for ticket in tickets]
     controller.command("retire", owner=10)
     allocation = controller.command("allocate", owner=20)
     assert not allocation["accepted"]
     print("Cancel A: B cannot reuse its page while either reader is pending.")
     for job in reversed(jobs):
-        case = job.input_now(controller, cache, page_size=4)
+        case = job.case_now(controller, kv_cache, page_size=4)
         actual = native.run(case)
         completion = controller.command("complete", ticket=job.ticket)
         assert actual == [101, 102, 103] and completion["accepted"]
@@ -37,7 +37,7 @@ def lifetime_demo(native):
 
     b = controller.command("allocate", owner=20)["lease"]
     assert b["page"] == a["page"] and b["generation"] > a["generation"]
-    cache[:] = [901, 902, 903, 904]
+    kv_cache[:] = [901, 902, 903, 904]
     ticket = controller.command("submit", owner=20, pages=[b])["ticket"]
     before = controller.state
     stale_completion = controller.command("complete", ticket=jobs[0].ticket)
@@ -51,7 +51,7 @@ def lifetime_demo(native):
     print("Both readers finished: B reuses the page; stale A completion is harmless.")
 
     # Construct the failure that an immediate-free policy would allow.
-    late = GatherCase(4, 3, 8, jobs[0].table, tuple(cache))
+    late = GatherCase(4, 3, 8, jobs[0].page_table, tuple(kv_cache))
     actual = native.run(late)
     assert actual == [901, 902, 903]
     print("Premature reuse would make A read", actual, "instead of [101, 102, 103].")

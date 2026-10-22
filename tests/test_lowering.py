@@ -3,15 +3,16 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from experiments.gather import cases, reference
+from experiments.gather import cases, expected_output
 from experiments.lowering import LoweredNative, lower, request_for
 
 
 U64 = (1 << 64) - 1
 
 
-def request(source, tokens=1, cache=()):
-    return dict(source=source, page_size=0, tokens=tokens, lanes=1, table=[], cache=list(cache))
+def request(source, num_tokens=1, kv_cache=()):
+    return dict(source=source, page_size=0, num_tokens=num_tokens, num_threads=1,
+                page_table=[], kv_cache=list(kv_cache))
 
 
 class LoweringTests(unittest.TestCase):
@@ -36,22 +37,23 @@ class LoweringTests(unittest.TestCase):
             result = self.agree(value)
             if native is None:
                 native = LoweredNative(result, directory=self.directory)
-            self.assertEqual(result["target"]["output"], reference(case))
-            self.assertEqual(native.run(value), reference(case))
+            self.assertEqual(result["target"]["output"], expected_output(case))
+            self.assertEqual(native.run(value), expected_output(case))
 
     def test_nested_masks_skip_invalid_reads_and_restore_predicates(self):
         program = {"seq": [
             {"when_lt": [1, 0, {"seq": [
-                {"load_cache": [0, U64]},
-                {"when_lt": [0, 1, {"load_table": [1, U64]}]}]}]},
+                {"load_kv_cache": [0, U64]},
+                {"when_lt": [0, 1, {"load_page_table": [1, U64]}]}]}]},
             {"when_lt": [0, 1, {"seq": [
                 {"when_lt": [5, 2, {"store": [0, 99]}]}, {"store": [0, 42]}]}]}]}
         result = self.agree(request(program), [42])
-        self.assertEqual(result["target"]["accesses"], [{"lane": 0, "space": "output", "address": 0}])
+        self.assertEqual(result["target"]["accesses"],
+                         [{"thread": 0, "buffer": "output", "index": 0}])
 
     def test_fault_preserves_write_and_access_prefix(self):
-        program = {"seq": [{"store": [0, 7]}, {"load_cache": [0, 9]}, {"store": [0, 99]}]}
-        value = request(program, cache=[10])
+        program = {"seq": [{"store": [0, 7]}, {"load_kv_cache": [0, 9]}, {"store": [0, 99]}]}
+        value = request(program, kv_cache=[10])
         result = self.agree(value)
         self.assertEqual(result["target"]["status"], "fault")
         self.assertEqual(result["target"]["output"], [7])
@@ -63,11 +65,11 @@ class LoweringTests(unittest.TestCase):
         expressions = [{"add": [U64, 1]}, {"mul": [U64, 2]},
                        {"div": [123, 0]}, {"mod": [123, 0]}, {"local": 77}]
         program = {"seq": [{"store": [i, expr]} for i, expr in enumerate(expressions)]}
-        self.agree(request(program, tokens=5), [0, (1 << 32) - 2, 0, 123, 0])
+        self.agree(request(program, num_tokens=5), [0, (1 << 32) - 2, 0, 123, 0])
 
     def test_cuda_scope(self):
         custom = self.agree(request({"store": [0, 1]}))
-        invalid = lower(dict(page_size=0, tokens=1, lanes=1, table=[0], cache=[7]))
+        invalid = lower(dict(page_size=0, num_tokens=1, num_threads=1, page_table=[0], kv_cache=[7]))
         for result in [custom, invalid]:
             with self.assertRaises(ValueError):
                 LoweredNative(result, cuda=True, directory=self.directory)

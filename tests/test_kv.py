@@ -2,7 +2,7 @@
 from dataclasses import replace
 import unittest
 
-from experiments.gather import reference
+from experiments.gather import expected_output
 from experiments.runtime import Controller, PendingGather
 
 
@@ -12,7 +12,7 @@ class KVTests(unittest.TestCase):
         a = controller.command("allocate", owner=10)["lease"]
         b = controller.command("allocate", owner=10)["lease"]
         ticket = controller.command("submit", owner=10, pages=[b, a])["ticket"]
-        return controller, ticket, PendingGather.from_ticket(ticket, tokens=3)
+        return controller, ticket, PendingGather.from_ticket(ticket, num_tokens=3)
 
     def test_reverse_completion_and_stale_events(self):
         controller = Controller(1)
@@ -46,25 +46,25 @@ class KVTests(unittest.TestCase):
         controller.command("complete", ticket=second["id"])
         self.assertEqual(controller.state["allocations"], [])
 
-    def test_pending_launch_reads_current_cache(self):
+    def test_pending_launch_reads_current_kv_cache(self):
         controller, _, job = self.launch()
-        cache = [10, 11, 20, 21]
-        before = job.input_now(controller, cache, 2)
+        kv_cache = [10, 11, 20, 21]
+        before = job.case_now(controller, kv_cache, 2)
         controller.command("retire", owner=10)
-        cache[2] = 99
-        self.assertEqual(reference(before), [20, 21, 10])
-        self.assertEqual(reference(job.input_now(controller, cache, 2)), [99, 21, 10])
+        kv_cache[2] = 99
+        self.assertEqual(expected_output(before), [20, 21, 10])
+        self.assertEqual(expected_output(job.case_now(controller, kv_cache, 2)), [99, 21, 10])
 
     def test_adapter_rejects_forged_and_completed_jobs(self):
         controller, ticket, job = self.launch()
-        for forged in [replace(job, ticket=999), replace(job, table=(0, 1))]:
+        for forged in [replace(job, ticket=999), replace(job, page_table=(0, 1))]:
             with self.assertRaises(ValueError):
-                forged.input_now(controller, [10, 11, 20, 21], 2)
+                forged.case_now(controller, [10, 11, 20, 21], 2)
         with self.assertRaises(ValueError):
-            job.input_now(controller, [10, 11, 20, 21, 30, 31], 2)
+            job.case_now(controller, [10, 11, 20, 21, 30, 31], 2)
         controller.command("complete", ticket=ticket["id"])
         with self.assertRaises(ValueError):
-            job.input_now(controller, [10, 11, 20, 21], 2)
+            job.case_now(controller, [10, 11, 20, 21], 2)
 
     def test_empty_pool_and_empty_operation(self):
         controller = Controller(0)

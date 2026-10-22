@@ -14,9 +14,9 @@ def compile : Cmd → List Instr
   | .skip => []
   | .seq first second => compile first ++ compile second
   | .set id value => compileExpr value ++ [.set id]
-  | .loadTable id address => compileExpr address ++ [.loadTable id]
-  | .loadCache id address => compileExpr address ++ [.loadCache id]
-  | .store address value => compileExpr address ++ compileExpr value ++ [.store]
+  | .loadPageTable id index => compileExpr index ++ [.loadPageTable id]
+  | .loadKVCache id index => compileExpr index ++ [.loadKVCache id]
+  | .store index value => compileExpr index ++ compileExpr value ++ [.store]
   | .whenLt lhs rhs body =>
     compileExpr lhs ++ compileExpr rhs ++ [.enterMask] ++ compile body ++ [.leaveMask]
 

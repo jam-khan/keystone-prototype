@@ -2,7 +2,7 @@
 
 Three small Lean 4 experiments around paged KV-cache access:
 
-1. **GPU semantics:** prove a gather kernel safe and correct under instruction interleavings.
+1. **GPU semantics:** prove a KV-gather kernel safe and correct under instruction interleavings.
 2. **KV lifetimes:** keep pages allocated until every submitted operation completes.
 3. **Verified lowering:** compile structured kernels into flat predicated instructions, preserving results and faults.
 
@@ -31,8 +31,8 @@ Read definitions before proofs. The wrappers can wait.
 
 | Topic | Definitions | Proofs / next step |
 |---|---|---|
-| GPU | [GPU/Model.lean](Keystone/GPU/Model.lean) | [Proofs.lean](Keystone/GPU/Proofs.lean), then [Progress.lean](Keystone/GPU/Progress.lean) |
-| KV cache | [KV/Controller.lean](Keystone/KV/Controller.lean) | [Examples.lean](Keystone/KV/Examples.lean), then [Lifetime.lean](Keystone/KV/Lifetime.lean) |
+| GPU | [GPU/KVGather.lean](Keystone/GPU/KVGather.lean) | [Proofs.lean](Keystone/GPU/Proofs.lean), then [Progress.lean](Keystone/GPU/Progress.lean) |
+| KV page lifetimes | [KV/Controller.lean](Keystone/KV/Controller.lean) | [Examples.lean](Keystone/KV/Examples.lean), then [Lifetime.lean](Keystone/KV/Lifetime.lean) |
 | Lowering | [Lowering/Language.lean](Keystone/Lowering/Language.lean) | [Compiler.lean](Keystone/Lowering/Compiler.lean), then [Proofs.lean](Keystone/Lowering/Proofs.lean) |
 | Connecting them | [Lowering/Gather.lean](Keystone/Lowering/Gather.lean) | [Composition.lean](Keystone/Composition.lean) |
 
@@ -42,13 +42,13 @@ Generated native files live under `artifacts/`; Lean builds live under `.lake/`.
 
 ## The computation
 
-For token `t`, page size `B`, and page table `P`:
+Thread `tid` copies token `tid`'s entry out of the paged KV cache (page size `B`):
 
 ```text
-out[t] = cache[P[t / B] * B + t % B]    if t < token_count
+output[tid] = kvCache[pageTable[tid / B] * B + tid % B]    if tid < numTokens
 ```
 
-The GPU model implements one gather kernel, with explicit masking and indexing.
+The GPU model implements this one KV-gather kernel, with explicit masking and indexing.
 The KV model exposes a different failure: an in-bounds kernel can read another
 request's data if a page is reused too early. The compiler proves that translating
 a structured program to flat instructions preserves outputs, access traces,
@@ -82,12 +82,12 @@ Run these examples alone with `lake env lean tests/Mutations.lean`.
 
 ## Proof boundary
 
-The lowering proof is per lane and ends at the IR. Serialization, native compilers,
+The lowering proof is per thread and ends at the IR. Serialization, native compilers,
 FFI, drivers, and hardware remain trusted. CUDA is implemented but untested locally;
 its runner accepts only valid gather programs with disjoint writes.
 
 The KV model assumes atomic host operations, truthful completion signals, and no
 writes to submitted pages. Delayed work is simulated on the host; native calls use
-private buffers. The gather copies UInt32 payloads; it is not attention
+private buffers. The gather copies one UInt32 entry per token; it is not attention
 or a complete inference engine. `make audit` checks the principal theorems for
 unexpected axioms. No proofs are admitted.

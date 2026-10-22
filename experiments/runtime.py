@@ -40,24 +40,25 @@ class Controller:
 
 @dataclass(frozen=True)
 class PendingGather:
-    """A delayed operation captures an ordered page table, not a cache copy."""
+    """A delayed operation captures an ordered page table, not a KV-cache copy."""
 
     ticket: int
-    table: tuple[int, ...]
-    tokens: int
+    page_table: tuple[int, ...]
+    num_tokens: int
 
     @classmethod
-    def from_ticket(cls, ticket: dict, tokens: int):
-        return cls(ticket["id"], tuple(lease["page"] for lease in ticket["pages"]), tokens)
+    def from_ticket(cls, ticket: dict, num_tokens: int):
+        return cls(ticket["id"], tuple(lease["page"] for lease in ticket["pages"]), num_tokens)
 
-    def input_now(self, controller: Controller, cache: list[int],
-                  page_size: int, block_size: int = 8) -> GatherCase:
+    def case_now(self, controller: Controller, kv_cache: list[int],
+                 page_size: int, block_size: int = 8) -> GatherCase:
+        """The launch this job would run now, against the current KV-cache contents."""
         state = controller.state
         ticket = next((t for t in state["pending"] if t["id"] == self.ticket), None)
-        if ticket is None or self.table != tuple(p["page"] for p in ticket["pages"]):
+        if ticket is None or self.page_table != tuple(p["page"] for p in ticket["pages"]):
             raise ValueError("gather does not match a live operation's captured page table")
         if any(p not in state["allocations"] for p in ticket["pages"]):
             raise ValueError("captured lease is no longer allocated")
-        if len(cache) != state["capacity"] * page_size:
-            raise ValueError("physical buffer does not match controller capacity")
-        return GatherCase(page_size, self.tokens, block_size, self.table, tuple(cache))
+        if len(kv_cache) != state["capacity"] * page_size:
+            raise ValueError("KV cache does not match controller capacity")
+        return GatherCase(page_size, self.num_tokens, block_size, self.page_table, tuple(kv_cache))
