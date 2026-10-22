@@ -51,4 +51,25 @@ private def badMem : KVMemory := { mem with pageTable := #[2, 0, 7] }
   | .error fault => fault == .outOfBounds ⟨4, .kvCache, 14⟩
   | .ok _ => false
 
+-- fewer threads than tokens: 8 tokens, 5 threads, so threads loop (grid-stride)
+-- thread 0 copies tokens 0 and 5, thread 1 copies 1 and 6, thread 2 copies 2 and 7
+private def cfgLoop : Config := { numTokens := 8, pageSize := 2, numThreads := 5 }
+private def memLoop : KVMemory :=
+  { pageTable := #[2, 0, 3, 1],
+    kvCache := #[10, 11, 20, 21, 30, 31, 40, 41]
+  }
+
+#guard validateLaunch cfgLoop memLoop
+#guard expectedOutput cfgLoop memLoop == #[30, 31, 10, 11, 40, 41, 20, 21]
+#guard match run cfgLoop memLoop (roundRobin cfgLoop) initialState with
+  | .ok (s, _) =>
+      completed cfgLoop s && outputEntries cfgLoop s == (expectedOutput cfgLoop memLoop).map some
+  | .error _ => false
+
+-- thread 0's stores hit slots 0 and 5
+#guard match run cfgLoop memLoop (roundRobin cfgLoop) initialState with
+  | .ok (_, accesses) =>
+      (accesses.filter (fun a => a.thread == 0 && a.buffer == .output)).map (·.index) == [0, 5]
+  | .error _ => false
+
 end Keystone.GPU.Examples
