@@ -1,17 +1,18 @@
 import Keystone.GPU.KVGather
 
 /-!
-# Proofs: the KV gather is safe, correct, and race-free
+# Auxiliary: proof infrastructure for `Properties.lean`
 
-The three main theorems, for ANY schedule of launched threads:
-1. `run_safe`: on a valid launch, no step faults and every access is in bounds.
-2. `completed_execution_correct`: once every thread is done, output = `expectedOutput`.
-3. `run_stores_distinct`: no output slot is written twice, so no two writes race.
-
-`Progress.lean` adds that `roundRobin` finishes every thread.
+1. Bounds and grid-stride arithmetic.
+2. The invariant every reachable state satisfies (`ThreadOK`, `Filled`, `Invariant`),
+   and `step_safe`: a launched thread steps without faulting and keeps the invariant.
+3. Stores: each store fills a slot that was empty.
+4. Progress: each thread's countdown `remaining`.
 -/
 
 namespace Keystone.GPU
+
+/-! ## Bounds: a valid launch keeps both reads in bounds -/
 
 /-- Token `t`'s `.table` read is inside the page table. -/
 theorem table_bounds
@@ -56,6 +57,23 @@ theorem token_div (ht : tid < cfg.numThreads) : token cfg tid r / cfg.numThreads
   unfold token
   rw [Nat.add_mul_div_right _ _ (Nat.lt_of_le_of_lt (Nat.zero_le tid) ht),
     Nat.div_eq_of_lt ht, Nat.zero_add]
+
+/-- A thread with a token left is in a round below `numRounds = ⌈numTokens / numThreads⌉`. -/
+private theorem round_lt_numRounds (ht : tid < cfg.numThreads)
+    (h : token cfg tid r < cfg.numTokens) : r < numRounds cfg := by
+  unfold numRounds
+  unfold token at h
+  apply Nat.not_le.mp
+  intro hle
+  -- r ≥ ⌈N / T⌉ would give r * T ≥ N, but tid + r * T < N
+  have hmul := Nat.mul_le_mul_right cfg.numThreads hle
+  have hd := Nat.div_add_mod (cfg.numTokens + cfg.numThreads - 1) cfg.numThreads
+  have hm := Nat.mod_lt (cfg.numTokens + cfg.numThreads - 1)
+    (Nat.lt_of_le_of_lt (Nat.zero_le tid) ht)
+  rw [Nat.mul_comm] at hd
+  omega
+
+/-! ## The invariant: what every reachable state satisfies -/
 
 /--
   `ThreadOK` is a predicate to ensure an invariant for a thread during
@@ -168,36 +186,21 @@ private theorem store_invariant (h : Invariant cfg mem s) (ht : tid < cfg.numThr
       rw [ite_eq_right het, h.2 e]
       simp only [hfill]
 
-/-! ## Safety: no step faults, every access is in bounds -/
-
-/-- An access is inside the buffer it touches. -/
-def AccessSafe (cfg : Config) (mem : KVMemory) (a : Access) : Prop :=
-  match a.buffer with
-  | .pageTable => a.index < mem.pageTable.size
-  | .kvCache   => a.index < mem.kvCache.size
-  | .output    => a.index < cfg.numTokens
-
--- a step makes either no access, or a safe one
-def EventSafe (cfg : Config) (mem : KVMemory) : Option Access → Prop
-  | none => True
-  | some a => AccessSafe cfg mem a
-
-/-- A launched thread steps without faulting, keeps the invariant, and accesses safely. -/
+/-- A launched thread steps without faulting and keeps the invariant. -/
 theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
     (ht : tid < cfg.numThreads) :
-    ∃ next access, step cfg mem tid s = .ok (next, access) ∧
-      Invariant cfg mem next ∧ EventSafe cfg mem access := by
+    ∃ next access, step cfg mem tid s = .ok (next, access) ∧ Invariant cfg mem next := by
   have hi := hinv.1 tid
   -- one case per instruction
   cases hp : (s.threads tid).instr with
   | guard =>
     by_cases hn : token cfg tid (s.threads tid).round < cfg.numTokens
     · -- a token is left: go to `.page`
-      refine ⟨withThread s tid { s.threads tid with instr := .page }, none, ?_, ?_, trivial⟩
+      refine ⟨withThread s tid { s.threads tid with instr := .page }, none, ?_, ?_⟩
       · simp [step, Nat.not_le_of_gt ht, hp, hn] <;> rfl
       · exact withThread_invariant hinv (by simpa [ThreadOK] using hn) rfl
     · -- no tokens left: go to `.done`
-      refine ⟨withThread s tid { s.threads tid with instr := .done }, none, ?_, ?_, trivial⟩
+      refine ⟨withThread s tid { s.threads tid with instr := .done }, none, ?_, ?_⟩
       · simp [step, Nat.not_le_of_gt ht, hp, hn] <;> rfl
       · exact withThread_invariant hinv (by simpa [ThreadOK] using hn) rfl
   | page =>
@@ -205,7 +208,7 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       simpa [ThreadOK, hp] using hi
     refine ⟨withThread s tid { s.threads tid with
         instr := .table, logicalPage := token cfg tid (s.threads tid).round / cfg.pageSize },
-      none, ?_, ?_, trivial⟩
+      none, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp] <;> rfl
     · exact withThread_invariant hinv ⟨hn, rfl⟩ rfl
   | table =>
@@ -217,10 +220,9 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       rw [hi'.2]; exact table_bounds hvalid hi'.1
     refine ⟨withThread s tid { s.threads tid with
         instr := .kvIndex, physicalPage := physicalPage mem (s.threads tid).logicalPage },
-      some ⟨tid, .pageTable, (s.threads tid).logicalPage⟩, ?_, ?_, ?_⟩
+      some ⟨tid, .pageTable, (s.threads tid).logicalPage⟩, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hb] <;> rfl
     · exact withThread_invariant hinv ⟨hi'.1, congrArg (physicalPage mem) hi'.2⟩ rfl
-    · exact hb
   | kvIndex =>
     have hi' : token cfg tid (s.threads tid).round < cfg.numTokens ∧
         (s.threads tid).physicalPage =
@@ -229,7 +231,7 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
     refine ⟨withThread s tid { s.threads tid with
         instr := .load, kvIndex := (s.threads tid).physicalPage * cfg.pageSize +
           token cfg tid (s.threads tid).round % cfg.pageSize },
-      none, ?_, ?_, trivial⟩
+      none, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp] <;> rfl
     · refine withThread_invariant hinv ⟨hi'.1, ?_⟩ rfl
       simp [hi'.2]
@@ -243,10 +245,9 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       rw [hi'.2]; exact kvCache_bounds hvalid hi'.1
     refine ⟨withThread s tid { s.threads tid with
         instr := .store, entry := mem.kvCache[(s.threads tid).kvIndex]! },
-      some ⟨tid, .kvCache, (s.threads tid).kvIndex⟩, ?_, ?_, ?_⟩
+      some ⟨tid, .kvCache, (s.threads tid).kvIndex⟩, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hb] <;> rfl
     · exact withThread_invariant hinv ⟨hi'.1, congrArg (fun i => mem.kvCache[i]!) hi'.2⟩ rfl
-    · exact hb
   | store =>
     have hi' : token cfg tid (s.threads tid).round < cfg.numTokens ∧ (s.threads tid).entry =
         mem.kvCache[mem.pageTable[token cfg tid (s.threads tid).round / cfg.pageSize]! *
@@ -256,53 +257,15 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
     refine ⟨withOutput (withThread s tid { s.threads tid with
           instr := .guard, round := (s.threads tid).round + 1 })
         (token cfg tid (s.threads tid).round) (s.threads tid).entry,
-      some ⟨tid, .output, token cfg tid (s.threads tid).round⟩, ?_, ?_, ?_⟩
+      some ⟨tid, .output, token cfg tid (s.threads tid).round⟩, ?_, ?_⟩
     · simp [step, Nat.not_le_of_gt ht, hp, Nat.not_le_of_gt hi'.1] <;> rfl
     · exact store_invariant hinv ht hi'.2
-    · exact hi'.1
   | done =>
-    exact ⟨s, none, by simp [step, Nat.not_le_of_gt ht, hp] <;> rfl, hinv, trivial⟩
-
-/-- Any schedule of launched threads runs without faults; it need not finish. -/
-theorem run_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
-    (hschedule : ∀ tid ∈ schedule, tid < cfg.numThreads) :
-    ∃ last accesses, run cfg mem schedule s = .ok (last, accesses) ∧
-      Invariant cfg mem last ∧ ∀ a ∈ accesses, AccessSafe cfg mem a := by
-  induction schedule generalizing s with
-  | nil => exact ⟨s, [], rfl, hinv, by simp⟩
-  | cons tid schedule ih =>
-    -- first step is safe (step_safe), the rest by induction
-    obtain ⟨next, access, hstep, hnext, ha⟩ :=
-      step_safe hvalid hinv (hschedule tid (by simp))
-    obtain ⟨last, accesses, hrun, hlast, has⟩ :=
-      ih hnext (fun j hj => hschedule j (by simp [hj]))
-    refine ⟨last, access.toList ++ accesses, ?_, hlast, ?_⟩
-    · simp only [run, hstep]
-      change (do let (last, accesses) ← run cfg mem schedule next
-                 pure (last, access.toList ++ accesses)) = _
-      rw [hrun]
-      rfl
-    · intro a ha'
-      rcases List.mem_append.mp ha' with hleft | hright
-      · cases access with
-        | none => simp at hleft
-        | some b =>
-          have hab : a = b := by simpa using hleft
-          subst a
-          exact ha
-      · exact has a hright
-
-/-! ## Correctness: a finished run produces the expected output -/
-
-def Finished (cfg : Config) (s : KernelState) : Prop :=
-  ∀ tid, tid < cfg.numThreads → (s.threads tid).instr = .done
-
-@[simp] theorem completed_eq_true : completed cfg s = true ↔ Finished cfg s := by
-  simp [completed, Finished, List.all_eq_true]
+    exact ⟨s, none, by simp [step, Nat.not_le_of_gt ht, hp] <;> rfl, hinv⟩
 
 -- once every thread is done, every output slot holds the expected entry
-private theorem finished_correct (hvalid : ValidLaunch cfg mem)
-    (hinv : Invariant cfg mem s) (hfinished : Finished cfg s)
+theorem finished_correct (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
+    (hfinished : ∀ tid, tid < cfg.numThreads → (s.threads tid).instr = .done)
     (he : e < cfg.numTokens) : s.output e = some (expectedEntry cfg mem e) := by
   -- slot e belongs to thread `e % numThreads`, which handles it in round `e / numThreads`
   have hT : 0 < cfg.numThreads := hvalid.2.1
@@ -320,19 +283,7 @@ private theorem finished_correct (hvalid : ValidLaunch cfg mem)
     omega
   rw [hinv.2 e, ite_eq_left hfill]
 
-/-- For ANY schedule that finishes: output matches the spec, and every access was safe. -/
-theorem completed_execution_correct (hvalid : ValidLaunch cfg mem)
-    (hschedule : ∀ tid ∈ schedule, tid < cfg.numThreads)
-    (hrun : run cfg mem schedule initialState = .ok (last, accesses))
-    (hdone : completed cfg last = true) :
-    (∀ t, t < cfg.numTokens → last.output t = some (expectedEntry cfg mem t)) ∧
-    (∀ a ∈ accesses, AccessSafe cfg mem a) := by
-  obtain ⟨last', accesses', hr, hi, ha⟩ := run_safe hvalid initial_invariant hschedule
-  rw [hrun] at hr
-  cases hr
-  exact ⟨fun _ ht => finished_correct hvalid hi (completed_eq_true.mp hdone) ht, ha⟩
-
-/-! ## No output slot is ever written twice -/
+/-! ## Stores: each store fills a slot that was empty -/
 
 -- a step never lowers any thread's round
 private theorem step_round_mono (ht : tid < cfg.numThreads)
@@ -369,7 +320,8 @@ private theorem step_filled_mono (ht : tid < cfg.numThreads)
     (hs : step cfg mem tid s = .ok (next, access)) (h : Filled cfg s e) : Filled cfg next e :=
   Nat.lt_of_lt_of_le h (step_round_mono ht hs _)
 
-private theorem run_stores_fresh (hschedule : ∀ tid ∈ schedule, tid < cfg.numThreads)
+-- every store in a run hits a slot that was empty at the start, and no two hit the same slot
+theorem run_stores_fresh (hschedule : ∀ tid ∈ schedule, tid < cfg.numThreads)
     (hrun : run cfg mem schedule s = .ok (last, accesses)) :
     (∀ a ∈ accesses, a.buffer = .output → ¬ Filled cfg s a.index) ∧
     accesses.Pairwise (fun a b => a.buffer = .output → b.buffer = .output → a.index ≠ b.index) := by
@@ -416,11 +368,115 @@ private theorem run_stores_fresh (hschedule : ∀ tid ∈ schedule, tid < cfg.nu
             subst a
             exact hfresh b hb hbo (heq ▸ (step_store_fresh ht hs hao).2)
 
-/-- In any run, no output slot is written twice:
-not by two threads, and not by one thread in two different rounds. -/
-theorem run_stores_distinct (hschedule : ∀ tid ∈ schedule, tid < cfg.numThreads)
-    (hrun : run cfg mem schedule s = .ok (last, accesses)) :
-    accesses.Pairwise (fun a b => a.buffer = .output → b.buffer = .output → a.index ≠ b.index) :=
-  (run_stores_fresh hschedule hrun).2
+/-! ## Progress: each thread's countdown
+
+`remaining` drops by 1 on each of the thread's steps and is 0 only at `.done`. -/
+
+/--
+  Turns a thread still needs: 6 for this and each later round (counted down
+  inside the current round), plus 1 for the final `.guard`.
+-/
+def remaining (cfg : Config) (thread : Thread) : Nat :=
+  let left := 6 * (numRounds cfg - thread.round)
+  match thread.instr with
+  | .guard   => left + 1
+  | .page    => left
+  | .table   => left - 1
+  | .kvIndex => left - 2
+  | .load    => left - 3
+  | .store   => left - 4
+  | .done    => 0
+
+-- a real (non-guard, non-done) instruction always has a token left
+private theorem active_token_lt (hok : ThreadOK cfg mem tid thread)
+    (hg : thread.instr ≠ .guard) (hd : thread.instr ≠ .done) :
+    token cfg tid thread.round < cfg.numTokens := by
+  unfold ThreadOK at hok
+  cases hp : thread.instr <;> simp_all
+
+/-- With the invariant, a launched thread's countdown is 0 only at `.done`. -/
+theorem remaining_eq_zero (hinv : Invariant cfg mem s) (ht : tid < cfg.numThreads)
+    (h0 : remaining cfg (s.threads tid) = 0) : (s.threads tid).instr = .done := by
+  by_cases hg : (s.threads tid).instr = .guard
+  · simp [remaining, hg] at h0
+  by_cases hd : (s.threads tid).instr = .done
+  · exact hd
+  -- otherwise a round is left, so the countdown is at least 2
+  have hr := round_lt_numRounds ht (active_token_lt (hinv.1 tid) hg hd)
+  cases hp : (s.threads tid).instr <;> simp_all [remaining] <;> omega
+
+-- each step of thread `tid` lowers its countdown by at least 1; other threads are unchanged
+private theorem step_remaining (hinv : Invariant cfg mem s) (ht : tid < cfg.numThreads)
+    (hs : step cfg mem tid s = .ok (next, access)) (j : Nat) :
+    remaining cfg (next.threads j) ≤
+      remaining cfg (s.threads j) - if j = tid then 1 else 0 := by
+  -- at `.store` a round is still left, so moving to the next round costs exactly 1
+  have hr : (s.threads tid).instr = .store → (s.threads tid).round < numRounds cfg := by
+    intro hstore
+    have hok := hinv.1 tid
+    simp only [ThreadOK, hstore] at hok
+    exact round_lt_numRounds ht hok.1
+  cases hp : (s.threads tid).instr <;>
+    simp [step, Nat.not_le_of_gt ht, hp] at hs
+  all_goals try split at hs
+  all_goals try cases hs
+  all_goals by_cases hj : j = tid <;> simp_all [withThread, withOutput, remaining] <;> omega
+
+/-- Each scheduled turn lowers that thread's countdown; done threads stay at 0. -/
+theorem run_remaining (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
+    (hschedule : ∀ t ∈ schedule, t < cfg.numThreads)
+    (hrun : run cfg mem schedule s = .ok (last, accesses)) (j : Nat) :
+    remaining cfg (last.threads j) ≤ remaining cfg (s.threads j) - schedule.count j := by
+  induction schedule generalizing s accesses with
+  | nil =>
+    cases hrun
+    simp
+  | cons tid schedule ih =>
+    have ht : tid < cfg.numThreads := hschedule tid (by simp)
+    cases hs : step cfg mem tid s with
+    | error e =>
+      simp [run, hs] at hrun <;> cases hrun
+    | ok pair =>
+      obtain ⟨next, access⟩ := pair
+      simp only [run, hs] at hrun
+      change (do let v ← run cfg mem schedule next
+                 pure (v.1, access.toList ++ v.2)) = Except.ok (last, accesses) at hrun
+      cases hr : run cfg mem schedule next with
+      | error e =>
+        simp [hr] at hrun <;> cases hrun
+      | ok pair =>
+        obtain ⟨last', accesses'⟩ := pair
+        simp only [hr] at hrun
+        cases hrun
+        -- the step keeps the invariant (step_safe), so the induction hypothesis applies
+        have hnext : Invariant cfg mem next := by
+          obtain ⟨next', access', hs', hinv'⟩ := step_safe hvalid hinv ht
+          rw [hs] at hs'
+          cases hs'
+          exact hinv'
+        have hind := ih hnext (fun t ht => hschedule t (by simp [ht])) hr
+        have hstep := step_remaining hinv ht hs j
+        by_cases hj : j = tid
+        · subst j
+          simp at *
+          omega
+        · have hj' : tid ≠ j := Ne.symm hj
+          simp [hj, hj'] at *
+          omega
+
+-- `roundRobin` schedules only launched threads ...
+theorem roundRobin_valid : ∀ t ∈ roundRobin cfg, t < cfg.numThreads := by
+  simp [roundRobin]
+
+private theorem count_rounds {cfg : Config} (ht : tid < cfg.numThreads) (n : Nat) :
+    ((List.replicate n (List.range cfg.numThreads)).flatten).count tid = n := by
+  induction n with
+  | zero => simp
+  | succ n ih => simp [List.replicate_succ, List.count_range, ht, ih] <;> omega
+
+-- ... and gives each one `6 * numRounds + 1` turns
+theorem roundRobin_count (ht : tid < cfg.numThreads) :
+    (roundRobin cfg).count tid = 6 * numRounds cfg + 1 :=
+  count_rounds ht _
 
 end Keystone.GPU

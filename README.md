@@ -31,13 +31,13 @@ your own words before incorporating it.
    **Done:** a complete schedule matches the specification; a starved lane stays
    incomplete; removing the mask or using the wrong page index exposes a failure.
 
-3. **Prove safety and values — `GPU/Proofs.lean`.** State `ValidInput` in the model;
+3. **Prove safety and values — `GPU/Auxiliary.lean`, `GPU/Properties.lean`.** State `ValidInput` in the model;
    build `LaneOK` and `Invariant`, then `table_bounds`, `cache_bounds`, `step_safe`,
    `run_safe`, and `completed_execution_correct`.
    **Done:** explain why each memory access is bounded and why completed outputs
    match the specification for any schedule containing valid lane IDs.
 
-4. **Prove completion — `GPU/Progress.lean`.** Track instructions remaining;
+4. **Prove completion — `GPU/Auxiliary.lean`, `GPU/Properties.lean`.** Track instructions remaining;
    prove `sufficiently_scheduled_finishes`, then `verified_roundRobin`.
    **Done:** six turns per lane suffice; explain why safety alone permits starvation.
 
