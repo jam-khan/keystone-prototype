@@ -16,7 +16,7 @@ private def cfg   : Config :=
   }
 private def input : Input :=
   { pageTable := #[2, 0, 1],
-    cache := #[10, 11, 20, 21, 30, 31]
+    kvCache := #[10, 11, 20, 21, 30, 31]
   }
 
 #guard validateInput  cfg input
@@ -42,13 +42,13 @@ private def input : Input :=
   | .ok (_, accesses) => accesses.all (fun a => a.thread < cfg.numElements)
   | .error _ => false
 
--- bad page table: logical page 2 → physical page 7, but cache has only pages 0–2
+-- bad page table: logical page 2 → physical page 7, but the KV cache has only pages 0–2
 private def badInput : Input := { input with pageTable := #[2, 0, 7] }
 
 #guard !validateInput cfg badInput
--- thread 4: page 2 → physical 7 → address 7 * 2 + 0 = 14 ≥ cache size 6, so `.load` faults
+-- thread 4: page 2 → physical 7 → kvIndex 7 * 2 + 0 = 14 ≥ KV-cache size 6, so `.load` faults
 #guard match run cfg badInput (roundRobin cfg) init with
-  | .error fault => fault == .outOfBounds ⟨4, .cache, 14⟩
+  | .error fault => fault == .outOfBounds ⟨4, .kvCache, 14⟩
   | .ok _ => false
 
 end Keystone.GPU.Examples
