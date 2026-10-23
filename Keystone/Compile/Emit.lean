@@ -1,4 +1,6 @@
-import Keystone.Compile.Compiler
+import Keystone.GPU.KVGather -- GPU.Instr block labels.
+import Keystone.Compile.Target -- Registers, operands, arithmetic, and instructions.
+import Keystone.Compile.Compiler -- compile supplies the blocks being emitted.
 
 namespace Keystone.Compile
 

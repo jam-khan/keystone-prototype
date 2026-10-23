@@ -1,4 +1,4 @@
-import Keystone.GPU.KVGather
+import Keystone.GPU.KVGather -- Gather execution, schedules, and expected output.
 
 /-!
 Checked examples for the running KV-gather example.

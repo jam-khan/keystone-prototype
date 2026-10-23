@@ -1,5 +1,6 @@
-import Keystone.Compile.Emit
-import Lean.Data.Json
+import Keystone.GPU.KVGather -- Source runs used to generate expected results.
+import Keystone.Compile.Emit -- emitC generates the C source.
+import Lean.Data.Json -- JSON encoding for the --oracle output.
 
 open Keystone GPU Lean
 

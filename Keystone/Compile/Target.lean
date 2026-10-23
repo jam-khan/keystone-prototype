@@ -1,4 +1,4 @@
-import Keystone.GPU.KVGather
+import Keystone.GPU.KVGather -- Reused GPU state, memory, stages, accesses, and faults.
 
 namespace Keystone.Compile
 

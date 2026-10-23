@@ -1,4 +1,5 @@
-import Keystone.GPU.Auxiliary
+import Keystone.GPU.KVGather -- Kernel model and schedules.
+import Keystone.GPU.Auxiliary -- Invariant and supporting proofs.
 
 /-!
 # Properties: what is proved about the KV gather

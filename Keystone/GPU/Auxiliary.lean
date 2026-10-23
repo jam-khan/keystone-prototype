@@ -1,4 +1,4 @@
-import Keystone.GPU.KVGather
+import Keystone.GPU.KVGather -- Kernel state, execution, and launch conditions.
 
 /-!
 # Auxiliary: proof infrastructure for `Properties.lean`
