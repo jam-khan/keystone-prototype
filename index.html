@@ -1,0 +1,276 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#ffffff">
+  <title>Keystone discussion</title>
+  <style>
+    :root{--paper:#ffffff;--ink:#24292f;--muted:#6b7280;--line:#e3e7ec;--teal:#1a5fb4;--teal-soft:#eef3fa;--amber:#9d621b;--amber-soft:#f6ead5;--kv:#66568a;--kv-soft:#f6f4f9;--scale:1}
+    *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:Inter,"Aptos",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid var(--teal);outline-offset:4px}button:disabled{cursor:default;opacity:.3}
+    .deck{position:absolute;left:50%;top:50%;width:1600px;height:900px;transform:translate(-50%,-50%) scale(var(--scale));transform-origin:center;background:var(--paper);overflow:hidden}
+    .slide{position:absolute;inset:0;width:1600px;height:900px;overflow:hidden;background:var(--paper)}[hidden]{display:none!important}
+    .masthead{position:absolute;left:72px;right:72px;top:28px;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:650;letter-spacing:2.1px;text-transform:uppercase;color:var(--muted)}
+    .masthead strong{color:var(--teal);font-weight:750}.masthead .status{letter-spacing:1.1px;font-size:12px;display:flex;gap:9px;align-items:center}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--teal)}
+    h1{position:absolute;left:72px;top:65px;margin:0;font-size:42px;line-height:1.1;font-weight:500;letter-spacing:-.5px}.subtitle{position:absolute;left:74px;top:118px;margin:0;font-size:18px;color:var(--muted)}
+    .workload{position:absolute;left:72px;right:72px;top:160px;height:160px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);display:grid;grid-template-columns:280px 790px 1fr;gap:24px;align-items:center}
+    .eyebrow{font-size:12px;font-weight:750;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}.workload h2{font-size:25px;font-weight:600;letter-spacing:-.5px;margin:0 0 10px}.workload p{font-size:16px;line-height:1.5;margin:0;color:var(--muted)}.mono{font-family:"JetBrains Mono","Fira Code","DejaVu Sans Mono","SFMono-Regular",Consolas,monospace}.workload .config{display:block;margin-top:11px;font-size:13px;color:var(--ink)}
+    .memory{width:790px;height:153px}.memory text{font-family:inherit;fill:var(--ink)}.memory .label{font-size:13px;fill:var(--muted)}.memory .value{font-size:16px;font-weight:550}.memory .page{font-size:10px;letter-spacing:1px}.memory .link{fill:none;stroke-width:1.5;opacity:.42}.memory .teal{fill:#d7ebe3}.memory .blue{fill:#e0e9ef}.memory .gold{fill:#f1e4cd}.memory .rose{fill:#eadfe6}
+    .threads{padding-left:18px;border-left:1px solid var(--line)}.threads .eyebrow{margin-bottom:8px}.thread-table{display:grid;grid-template-columns:64px repeat(5,30px);column-gap:4px;row-gap:7px;align-items:center;font-size:14px}.thread-table .label{font-size:12px;color:var(--muted)}.thread-table .token{text-align:center;background:#e9eeea;border-radius:4px;height:24px;line-height:24px}.thread-table .idle{background:transparent;color:#b2bcb7}.thread-table .tid{text-align:center;color:var(--muted);font-size:12px}.formula{font-size:11px;color:var(--muted);margin-top:11px;white-space:nowrap}
+    .proof-frame{position:absolute;left:56px;top:356px;width:878px;height:278px;border:1px solid #b5c6df;border-radius:13px;pointer-events:none;background:linear-gradient(180deg,rgba(238,243,250,.2),rgba(238,243,250,.04))}.proof-frame-label{position:absolute;top:-10px;left:18px;padding:0 10px;background:var(--paper);font-size:12px;letter-spacing:1.6px;font-weight:700;color:var(--teal);text-transform:uppercase}
+    .box{position:absolute;top:380px;height:193px}.source{left:76px;width:371px}.target{left:525px;width:383px}.box h2{margin:0;font-size:25px;font-weight:600;letter-spacing:-.6px;display:flex;align-items:center;gap:11px}.index{display:inline-flex;width:25px;height:25px;border:1px solid #bdcde3;border-radius:50%;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:var(--teal);flex:none}.box p{margin:8px 0 0;font-size:15px;line-height:1.5;color:var(--muted)}
+    .source .machine{margin-top:15px;border:1px solid #e3e7ec;border-radius:7px;padding:11px 12px;background:#f7f8fa;font-size:12px;line-height:1.8;color:var(--ink)}.source .machine .state{color:var(--muted);font-size:11px}.source .loop{display:flex;align-items:center;justify-content:space-between;font-size:13px;padding-top:7px;letter-spacing:-.2px}.source .loop span{color:#a3b1a8}.source .loop .op{color:var(--teal);font-weight:600}.source .loop-back{font-size:11px;color:var(--muted);text-align:right;margin-top:3px}.source .done{color:var(--muted)}
+    .compile-arrow{position:absolute;left:453px;top:434px;width:61px;height:80px;text-align:center;color:var(--teal);font-size:11px}.compile-arrow svg{display:block;margin:10px 0 6px}.compile-arrow .count{color:var(--muted);font-size:10px}.target .code{margin-top:12px;padding:9px 13px;border-left:3px solid #83a6d1;background:#f7f8fa;border-radius:0 5px 5px 0;font-size:12px;line-height:1.7;color:#24292f;white-space:pre}.target .source-label{color:var(--muted);font-size:10px;display:flex;justify-content:space-between;margin-top:7px;letter-spacing:.3px}.target .exact{font-size:13px;color:var(--teal);margin-top:9px;font-weight:550}.target .exact code{font-size:12px;font-weight:650}
+    .properties{position:absolute;left:76px;top:605px;width:831px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}.property{font-size:13px;color:var(--ink);display:flex;align-items:center;white-space:nowrap}.property:before{content:none}.property+.property{border-left:1px solid #c4d8cb;padding-left:11px}
+    .trust-edge{position:absolute;left:959px;top:358px;height:276px;border-left:1px dashed #bf9860}.trust-edge:before{content:"PROOF BOUNDARY";position:absolute;left:-10px;top:113px;background:var(--paper);writing-mode:vertical-rl;transform:rotate(180deg);font-size:10px;font-weight:700;letter-spacing:1.6px;color:var(--amber);padding:10px 4px}.trust-arrow{position:absolute;left:918px;top:452px}.emitter{left:1001px;width:280px}.emitter .index,.native .index{border-color:#d6bc93;color:var(--amber)}.emitter h2{font-size:24px}.emitter .code{margin-top:15px;background:var(--amber-soft);border-left:3px solid #c9974f;padding:12px;font-size:13px;line-height:1.8;color:#725025;white-space:pre;border-radius:0 5px 5px 0}.native-arrow{position:absolute;left:1289px;top:452px}.native{left:1335px;width:193px}.native h2{font-size:24px}.native .cpu{width:60px;height:60px;border:1px solid #d3bc99;border-radius:8px;margin:20px 0 12px;position:relative;display:flex;align-items:center;justify-content:center;color:var(--amber);font-size:13px;font-weight:650;background:#f9f1e5}.cpu:before,.cpu:after{content:"";position:absolute;width:28px;height:70px;top:-6px;left:15px;border-top:3px double #bf9b69;border-bottom:3px double #bf9b69}.cpu:after{transform:rotate(90deg)}.native .native-copy{font-size:13px;line-height:1.5;color:var(--muted)}
+    .runtime-state{display:inline-flex;align-items:center;gap:8px;border:1px solid #d3cada;border-radius:4px;margin-top:12px;padding:5px 9px;color:var(--kv);font-size:12px}
+    .source .runtime-state{position:absolute;right:0;top:37px;margin:0;font-size:11px;padding:4px 7px}.runtime-state:before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor}
+    .kv-visible #physical-page-2 rect{stroke:var(--kv);stroke-width:2}
+    .connections{position:absolute;inset:0;z-index:2;width:1600px;height:900px;pointer-events:none}
+    .connections *{pointer-events:none!important}.connections text{font-family:inherit;font-size:12px;fill:var(--kv)}
+    .connections path.link{fill:none;stroke:var(--kv);stroke-width:1.6;stroke-dasharray:5 5}
+    .connections .completion-line{opacity:.35;transition:opacity .25s}.kv-complete .connections .completion-line{opacity:1}
+
+    .kv-band{position:absolute;left:56px;top:688px;width:1472px;height:136px;border:1px solid #b5c6df;border-radius:10px;background:#f8fafe}
+    .kv-heading{position:absolute;left:20px;top:21px;width:280px}.kv-heading h2{margin:0;font-size:23px;font-weight:550;letter-spacing:-.5px}
+    .kv-guarantees{position:absolute;left:20px;right:20px;bottom:9px;display:flex;gap:20px;align-items:center;color:var(--teal);font-size:12px}.kv-guarantees span+span{border-left:1px solid #c5d4e7;padding-left:20px}
+    .kv-heading p{margin:8px 0 0;font-size:13px;color:var(--muted)}.kv-heading code{font-size:12px}
+    .kv-steps{position:absolute;left:324px;right:20px;top:16px;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:40px}
+    .kv-step{position:relative;min-height:79px;border:1px solid #d8d2e1;border-radius:5px;padding:10px 12px;background:white}
+    .kv-step+.kv-step:before{content:"→";position:absolute;left:-30px;top:31px;font-size:21px;color:var(--kv)}
+    .kv-step h3{font-size:16px;line-height:20px;font-weight:550;margin:0}.kv-step .action{font-size:12px;color:var(--muted);margin:4px 0 7px}
+    .kv-state{display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:14px;line-height:20px;color:var(--kv)}.kv-state b{font-weight:550;font-variant-numeric:tabular-nums;white-space:nowrap}
+    .kv-step.held{background:var(--kv-soft)}.kv-step.waiting{border-style:dashed;background:transparent}.kv-step.waiting:before{opacity:0}.kv-complete .kv-step.waiting:before{opacity:1}.kv-step.waiting .kv-state{color:var(--muted)}
+    .kv-complete .kv-step.waiting{border-style:solid;background:var(--kv-soft)}.kv-complete .kv-step.waiting .kv-state{color:var(--kv)}
+    footer{position:absolute;left:72px;right:72px;bottom:29px;display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--muted)}.stage-label{min-width:285px;display:flex;align-items:center;gap:12px}.stage-counter{font-size:11px;letter-spacing:1px;color:var(--teal);font-weight:650}.dots{display:flex;gap:6px}.dot{width:20px;height:5px;background:#d9dfda;border:0;padding:0;border-radius:3px;transition:background .2s;position:relative}.dot:before{content:"";position:absolute;inset:-9px 0}.dot.active{background:var(--teal)}.navigation{display:flex;gap:9px;align-items:center}.control{border:1px solid #d5ded6;background:transparent;color:var(--ink);border-radius:5px;padding:7px 11px;font-size:12px;min-height:31px}.control:hover:not(:disabled){background:#eef3fa}.control.arrow{width:33px;padding:6px 0}.control.primary{color:var(--teal);border-color:#bdcde3}
+    [data-show]{opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .38s ease,transform .38s ease,visibility .38s;pointer-events:none}[data-show].revealed{opacity:1;visibility:visible;transform:translateY(0);pointer-events:auto}.proof-frame[data-show]{transform:none}
+    .slide-picker{display:flex;gap:6px}.slide-tab{border:0;border-radius:4px;background:transparent;color:var(--muted);padding:7px 9px;font-size:12px}.slide-tab[aria-current="page"]{background:var(--teal-soft);color:var(--teal)}.stage-label{min-width:190px}footer{z-index:5}
+    .wf-workload{position:absolute;left:72px;top:167px;width:1456px;height:72px;display:flex;align-items:center;gap:32px;padding:0 24px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+    .wf-workload h2{margin:0;font-size:22px;font-weight:550}.wf-workload p{margin:0;color:var(--muted);font-size:17px}
+    .wf-wires{position:absolute;inset:0;width:1600px;height:900px;pointer-events:none}.wf-wires path{fill:none;stroke:#9aa6b5;stroke-width:1.6}.wf-wires text{font-family:inherit;fill:var(--muted);font-size:12px}.wf-wires .repeat{stroke:var(--teal)}
+    .wf-engine{position:absolute;top:281px;height:251px;border:1px solid #d7dde5;border-radius:9px;padding:22px 24px;background:white}.wf-baseline{left:72px;width:460px}.wf-candidate{left:612px;width:916px}
+    .wf-engine h2{margin:0;font-size:25px;font-weight:550;letter-spacing:-.4px}.wf-baseline .wf-engine-name{font-size:27px;margin:67px 0 0;color:var(--ink)}
+    .wf-components{display:grid;grid-template-columns:228px 55px 240px 55px 228px;align-items:center;margin-top:55px}.wf-component{position:relative;height:86px;border:1px solid #d7dde5;border-radius:6px;padding:17px 16px;background:#f7f8fa;transition:background .3s,border-color .3s}.wf-component h3{margin:0;font-size:20px;font-weight:550}.wf-component p{margin:10px 0 0;font-size:13px;color:var(--muted)}.wf-connector{text-align:center;color:#9aa6b5;font-size:23px}.wf-connector small{display:block;font-size:10px;color:var(--muted);margin-bottom:3px}
+    .wf-completion{position:absolute;inset:0;width:916px;height:251px;pointer-events:none}.wf-completion path{fill:none;stroke:#9aa6b5;stroke-width:1.3}.wf-completion text{fill:var(--muted);font-size:11px;font-family:inherit}.wf-verified .wf-kv{border-color:#729aca;background:var(--teal-soft)}.wf-verified .wf-kv h3,.wf-verified .wf-kv p{color:var(--teal)}.wf-proof-tag{position:absolute;top:-11px;right:11px;padding:3px 7px;border:1px solid #729aca;border-radius:3px;background:white;font-size:10px;letter-spacing:.7px;color:var(--teal);text-transform:uppercase}
+    .wf-evaluation{position:absolute;left:72px;top:579px;width:1456px;height:88px;border:1px solid #c5d4e7;border-radius:7px;background:#f7f9fc;display:grid;grid-template-columns:270px repeat(4,1fr);align-items:center;padding:0 24px;gap:20px}.wf-evaluation h2{margin:0;font-size:22px;font-weight:550;color:var(--teal)}.wf-metric{border-left:1px solid #dbe2ec;padding-left:21px}.wf-metric b{display:block;font-size:17px;font-weight:550}
+    .wf-example{position:absolute;left:72px;top:705px;width:1456px}.wf-example-title{margin:0 0 13px;font-size:13px;color:var(--muted);letter-spacing:.4px}.wf-example-title strong{font-weight:600;color:var(--ink)}.wf-increments{display:grid;grid-template-columns:448px 44px 448px 44px 472px;align-items:center}.wf-increment{height:91px;padding:14px 17px;border:1px solid var(--line);border-radius:6px;background:white}.wf-increment h3{margin:0;font-size:17px;font-weight:550}.wf-increment p{margin:11px 0 0;font-size:15px;color:var(--muted);white-space:nowrap}.wf-increment .wf-note{font-size:11px;font-weight:400;color:var(--muted);margin-left:9px}.wf-increment.property-step{border-color:#bdcfe5;background:#f7f9fc}.wf-increment.property-step h3{color:var(--teal)}.wf-step-arrow{text-align:center;color:#9aa6b5;font-size:23px}
+    .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}@media print{html,body{width:1600px;height:auto;overflow:visible}.deck{position:static;width:1600px;height:auto;transform:none;overflow:visible}.slide,.slide[hidden]{position:relative;display:block!important;break-after:page}.slide:last-of-type{break-after:auto}[data-show]{opacity:1;visibility:visible;transform:none}footer{display:none!important}@page{size:1600px 900px;margin:0}}
+  </style>
+</head>
+<body>
+  <main class="deck" aria-label="Keystone discussion slides">
+  <section class="slide" id="architecture" aria-label="Slide 1: Paged KV gather">
+    <div class="masthead"><strong>Prototype</strong><span class="status">Lean 4</span></div>
+    <h1>Paged KV gather</h1>
+
+    <section class="workload" aria-label="Concrete paged gather example">
+      <div><h2>Page lookup</h2><span class="mono config">8 tokens · 2 / page · 5 threads</span></div>
+      <svg class="memory" viewBox="0 0 790 153" role="img" aria-label="Cache pages 0,1,2,3 contain 10 11,20 21,30 31,40 41. Page table 2,0,3,1 gathers output 30 31,10 11,40 41,20 21.">
+        <text class="label" x="0" y="30">KV cache</text><text class="label" x="0" y="83">page table</text><text class="label" x="0" y="135">output</text>
+        <path class="link" d="M 188 44 C 188 66 350 57 350 71" stroke="#6d9ba8"/><path class="link" d="M 350 44 C 350 60 674 60 674 71" stroke="#bf98ae"/><path class="link" d="M 512 44 C 512 57 188 57 188 71" stroke="#70aa8a"/><path class="link" d="M 674 44 C 674 60 512 59 512 71" stroke="#c6a363"/>
+        <g transform="translate(115 8)"><rect class="blue" width="146" height="37" rx="5"/><text class="page" x="10" y="14">P0</text><text class="value" x="61" y="25">10   11</text></g>
+        <g transform="translate(277 8)"><rect class="rose" width="146" height="37" rx="5"/><text class="page" x="10" y="14">P1</text><text class="value" x="61" y="25">20   21</text></g>
+        <g id="physical-page-2" transform="translate(439 8)"><rect class="teal" width="146" height="37" rx="5"/><text class="page" x="10" y="14">P2</text><text class="value" x="61" y="25">30   31</text></g>
+        <g transform="translate(601 8)"><rect class="gold" width="146" height="37" rx="5"/><text class="page" x="10" y="14">P3</text><text class="value" x="61" y="25">40   41</text></g>
+        <g text-anchor="middle"><rect x="168" y="68" width="40" height="25" rx="5" fill="#e0ede3"/><text class="value" x="188" y="85">2</text><rect x="330" y="68" width="40" height="25" rx="5" fill="#e1e9ed"/><text class="value" x="350" y="85">0</text><rect x="492" y="68" width="40" height="25" rx="5" fill="#f1e7d4"/><text class="value" x="512" y="85">3</text><rect x="654" y="68" width="40" height="25" rx="5" fill="#eadfe6"/><text class="value" x="674" y="85">1</text></g>
+        <path d="M188 96v11m162-11v11m162-11v11m162-11v11" stroke="#acbcb0" fill="none"/>
+        <g transform="translate(115 110)"><rect class="teal" width="146" height="35" rx="5"/><text class="page" x="10" y="14">0–1</text><text class="value" x="61" y="24">30   31</text></g>
+        <g transform="translate(277 110)"><rect class="blue" width="146" height="35" rx="5"/><text class="page" x="10" y="14">2–3</text><text class="value" x="61" y="24">10   11</text></g>
+        <g transform="translate(439 110)"><rect class="gold" width="146" height="35" rx="5"/><text class="page" x="10" y="14">4–5</text><text class="value" x="61" y="24">40   41</text></g>
+        <g transform="translate(601 110)"><rect class="rose" width="146" height="35" rx="5"/><text class="page" x="10" y="14">6–7</text><text class="value" x="61" y="24">20   21</text></g>
+      </svg>
+      <div class="threads"><div class="eyebrow">Thread assignment</div><div class="thread-table"><span class="label">thread</span><span class="tid">0</span><span class="tid">1</span><span class="tid">2</span><span class="tid">3</span><span class="tid">4</span><span class="label">round 0</span><span class="token">0</span><span class="token">1</span><span class="token">2</span><span class="token">3</span><span class="token">4</span><span class="label">round 1</span><span class="token">5</span><span class="token">6</span><span class="token">7</span><span class="token idle">—</span><span class="token idle">—</span></div><div class="formula mono">token = tid + round × numThreads</div></div>
+    </section>
+
+    <div class="proof-frame" data-show="1"><span class="proof-frame-label">Proved in Lean</span></div>
+    <section class="box source" data-show="1" aria-label="GPU kernel model">
+      <h2><span class="index">1</span>GPU kernel model</h2><p>schedule → thread → stage</p>
+      <div class="machine"><div class="state mono">threads { pc, round, registers } + output</div><div class="loop"><b class="op">guard</b><span>→</span>page<span>→</span>table<span>→</span>kvIndex<span>→</span>load<span>→</span>store</div><div class="loop-back">↶ next round &nbsp; · &nbsp; guard → done</div></div>
+      <div class="runtime-state" data-show="5"><span id="runtime-state">in flight</span></div>
+    </section>
+    <div class="compile-arrow" data-show="3"><span>compile</span><svg width="61" height="12" viewBox="0 0 61 12" aria-hidden="true"><path d="M1 6h55m-6-5 6 5-6 5" stroke="#1a5fb4" fill="none" stroke-width="1.6"/></svg><span class="count">stage → block</span></div>
+    <section class="box target" data-show="3" aria-label="Compiled target instructions">
+      <h2><span class="index">2</span>Target instructions</h2><p id="target-execution">Shared state · separate interpreter</p>
+      <div class="code mono">temp ← round × numThreads
+temp ← tid + temp
+logicalPage ← temp / pageSize
+jump table</div><div class="source-label"><span>.page BLOCK</span></div>
+      <div class="exact"><code>run_eq</code> &nbsp; same state, access trace, or fault</div>
+    </section>
+    <div class="properties" data-show="2"><span class="property">In-bounds accesses</span><span class="property">Correct if complete</span><span class="property">Distinct stores</span><span class="property">Progress if scheduled</span><span class="property">Round-robin completion</span></div>
+    <div class="trust-edge" data-show="4" aria-hidden="true"></div>
+    <svg class="trust-arrow" data-show="4" width="74" height="12" viewBox="0 0 74 12" aria-hidden="true"><path d="M1 6h66m-6-5 6 5-6 5" stroke="#b2864c" fill="none" stroke-width="1.6"/></svg>
+    <section class="box emitter" data-show="4" aria-label="Trusted code emission">
+      <h2><span class="index">3</span>Trusted emission</h2><div class="code mono">C99
+checked uint64_t</div>
+    </section>
+    <svg class="native-arrow" data-show="4" width="37" height="12" viewBox="0 0 37 12" aria-hidden="true"><path d="M1 6h31m-6-5 6 5-6 5" stroke="#b2864c" fill="none" stroke-width="1.6"/></svg>
+    <section class="box native" data-show="4" aria-label="Native execution"><h2>Native C</h2><div class="cpu" aria-hidden="true">CPU</div><div class="native-copy">CPU replay</div></section>
+
+    <svg class="connections" viewBox="0 0 1600 900" aria-label="Runtime.launch supplies the page table. Runtime.run executes Compile.run against the shared cache. GPU.completed gates Runtime.finish.">
+      <defs>
+        <marker id="kv-arrow" markerWidth="7" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L6 4L0 8" fill="none" stroke="#66568a" stroke-width="1.2"/></marker>
+      </defs>
+      <g data-show="5">
+        <path class="link" d="M205 688V656H36V240H66" marker-end="url(#kv-arrow)"/>
+        <text x="58" y="648">ticket → page table</text>
+        <path class="link" d="M1116 322V339H720V374" marker-end="url(#kv-arrow)"/><text x="821" y="332">live cache</text>
+        <g class="completion-line"><path class="link" d="M914 550H946V660H1090V701" marker-end="url(#kv-arrow)"/><text x="979" y="650">GPU.completed → finish</text></g>
+      </g>
+    </svg>
+    <section class="kv-band" data-show="5" aria-label="Proved KV page manager connected to the compiled gather. P2 detail from ticket T0 holding pages 2,0,3,1.">
+      <span class="proof-frame-label">Proved in Lean</span>
+      <div class="kv-heading"><h2>KV page manager</h2><p><code>T0 → [2, 0, 3, 1]</code></p></div>
+      <div class="kv-steps">
+        <div class="kv-step held"><h3>Launch A</h3><div class="action">ticket T0</div><div class="kv-state"><span>P2 held</span><b>pending 1</b></div></div>
+        <div class="kv-step held" data-show="6"><h3>Cancel A</h3><div class="action">retired</div><div class="kv-state"><span>P2 held</span><b>pending 1</b></div></div>
+        <div class="kv-step" data-show="7"><h3>Finish T0</h3><div class="action">all threads done</div><div class="kv-state"><span>P2 released</span><b>pending = 0</b></div></div>
+        <div class="kv-step waiting" data-show="6"><h3>Request B</h3><div class="action">allocate</div><div class="kv-state"><span id="reuse-state">P2 unavailable</span><b id="reuse-owner">held by A</b></div></div>
+      </div>
+      <div class="kv-guarantees"><span>Exclusive allocations</span><span data-show="6">Pending pages retained · contents unchanged</span><span data-show="7">Output = launch result</span></div>
+    </section>
+
+  </section>
+
+  <section class="slide" id="workflow" aria-label="Slide 2: Proposed Keystone development workflow" hidden>
+    <div class="masthead"><strong>Keystone</strong><span>Proposed workflow</span></div>
+    <h1>Incremental verification</h1>
+    <p class="subtitle">Competitive engine → verify components → remeasure</p>
+
+    <section class="wf-workload" data-show="0" aria-label="Identical workload and configuration for both engines">
+      <h2>Shared workload</h2><p>Model · GPU · precision · request trace</p>
+    </section>
+
+    <svg class="wf-wires" viewBox="0 0 1600 900" aria-label="The same workload feeds both engines, whose results enter the evaluation harness. Repeat for the next component.">
+      <defs>
+        <marker id="wf-arrow" markerWidth="7" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L6 4L0 8" style="stroke:#9aa6b5;stroke-width:1.2"/></marker>
+        <marker id="wf-repeat-arrow" markerWidth="7" markerHeight="8" refX="6" refY="4" orient="auto"><path d="M0 0L6 4L0 8" style="stroke:#1a5fb4;stroke-width:1.2"/></marker>
+      </defs>
+      <g data-show="1"><path d="M302 240V278" marker-end="url(#wf-arrow)"/></g>
+      <g data-show="2"><path d="M302 533V576" marker-end="url(#wf-arrow)"/></g>
+      <g data-show="3"><path d="M1070 240V278" marker-end="url(#wf-arrow)"/><path d="M1070 533V576" marker-end="url(#wf-arrow)"/></g>
+      <g data-show="7"><path class="repeat" d="M1529 623H1553V313H1531" marker-end="url(#wf-repeat-arrow)"/><text x="1572" y="495" transform="rotate(-90 1572 495)" style="fill:#1a5fb4">next component</text></g>
+    </svg>
+
+    <section class="wf-engine wf-baseline" data-show="1" aria-label="Reference engine">
+      <h2>Reference engine</h2>
+      <div class="wf-engine-name">vLLM / SGLang</div>
+    </section>
+
+    <section class="wf-engine wf-candidate" data-show="3" aria-label="Candidate engine with one component replaced at a time">
+      <h2>Keystone candidate</h2>
+      <div class="wf-components">
+        <div class="wf-component"><h3>Scheduler / runtime</h3></div>
+        <div class="wf-connector"><small>allocate / pin</small>→</div>
+        <div class="wf-component wf-kv"><span class="wf-proof-tag" data-show="5">verified replacement</span><h3>KV page manager</h3><p id="wf-kv-contract">page table · page lifetime</p></div>
+        <div class="wf-connector"><small>pages</small>→</div>
+        <div class="wf-component"><h3>GPU kernels</h3></div>
+      </div>
+      <svg class="wf-completion" viewBox="0 0 916 251" aria-label="GPU completion returns to the KV page manager"><path d="M717 194V225H428V195" marker-end="url(#wf-arrow)"/><text x="546" y="218">completion</text></svg>
+    </section>
+
+    <section class="wf-evaluation" data-show="2" aria-label="Evaluation harness comparing correctness, throughput, latency, and memory">
+      <div><h2>Evaluation harness</h2></div>
+      <div class="wf-metric"><b>Correctness</b></div>
+      <div class="wf-metric"><b>Throughput</b></div>
+      <div class="wf-metric"><b>Latency</b></div>
+      <div class="wf-metric"><b>Memory</b></div>
+    </section>
+
+    <section class="wf-example" data-show="4" aria-label="Prototype failure case used to illustrate the proposed evaluation workflow">
+      <p class="wf-example-title">KV page lifetime</p>
+      <div class="wf-increments">
+        <div class="wf-increment"><h3>Failure <span class="wf-note">injected</span></h3><p>Cancel A → reuse P2 → A reads B’s data</p></div>
+        <div class="wf-step-arrow" data-show="5">→</div>
+        <div class="wf-increment property-step" data-show="5"><h3>Prove + integrate</h3><p>Pending pages retained · contents unchanged</p></div>
+        <div class="wf-step-arrow" data-show="6">→</div>
+        <div class="wf-increment" data-show="6"><h3>Replay + measure</h3><p>Cancel A → hold P2 → GPU done → reuse</p></div>
+      </div>
+    </section>
+  </section>
+
+    <footer><nav class="slide-picker" aria-label="Slides"><button class="slide-tab" data-slide="0">1 · Gather</button><button class="slide-tab" data-slide="1">2 · Workflow</button></nav><div class="stage-label"><span class="stage-counter" id="counter">01 / 08</span><span id="stage-name">Gather</span></div><nav class="dots" aria-label="Reveal stages"></nav><div class="navigation"><button class="control arrow" id="prev" aria-label="Previous reveal">←</button><button class="control arrow primary" id="next" aria-label="Next reveal">→</button><button class="control" id="all">Show all</button><button class="control" id="fullscreen" aria-label="Toggle fullscreen">⛶</button></div></footer>
+    <div class="sr-only" id="announcement" aria-live="polite"></div>
+  </main>
+  <script>
+    const slides = [
+      {id:'architecture', stages:['Gather', 'Thread model', 'Properties', 'Compile', 'C emission', 'KV · launch', 'KV · cancel', 'KV · finish']},
+      {id:'workflow', stages:['Shared workload', 'Reference engine', 'Evaluation harness', 'Candidate engine', 'Failure case', 'Verified replacement', 'Re-evaluate', 'Next component']}
+    ];
+    const $ = id => document.getElementById(id);
+    let current = 0, activeSlide = 0;
+    function show(index,slideIndex=activeSlide){
+      activeSlide=Math.max(0,Math.min(slides.length-1,slideIndex));
+      const {id,stages}=slides[activeSlide];
+      current=Math.max(0,Math.min(stages.length-1,index));
+      slides.forEach((slide,i)=>$(slide.id).hidden=i!==activeSlide);
+      const slide=$(id);
+      slide.querySelectorAll('[data-show]').forEach(el=>{
+        const visible=Number(el.dataset.show)<=current;
+        el.classList.toggle('revealed',visible);
+        el.setAttribute('aria-hidden',String(!visible));
+      });
+      const dots=document.querySelector('.dots');
+      if(dots.dataset.slide!==String(activeSlide)){
+        dots.replaceChildren();dots.dataset.slide=String(activeSlide);
+        stages.forEach((name,i)=>{
+          const button=document.createElement('button');button.className='dot';
+          button.setAttribute('aria-label',`Stage ${i+1}: ${name}`);
+          button.onclick=()=>show(i);dots.append(button);
+        });
+      }
+      dots.querySelectorAll('.dot').forEach((el,i)=>{
+        el.classList.toggle('active',i<=current);el.setAttribute('aria-current',i===current?'step':'false');
+      });
+      document.querySelectorAll('.slide-tab').forEach(el=>el.setAttribute('aria-current',Number(el.dataset.slide)===activeSlide?'page':'false'));
+      if(activeSlide===0){
+        slide.classList.toggle('kv-visible',current>=5);slide.classList.toggle('kv-complete',current>=7);
+        $('runtime-state').textContent=current>=7?'completed':'in flight';
+        $('target-execution').textContent=current>=5?'Runtime.run → Compile.run':'Shared state · separate interpreter';
+        $('reuse-state').textContent=current>=7?'reclaim → allocate':'P2 unavailable';
+        $('reuse-owner').textContent=current>=7?'P2 → B':'held by A';
+      }else{
+        slide.classList.toggle('wf-verified',current>=5);
+        $('wf-kv-contract').textContent=current>=5?'retain pages and contents':'page table · page lifetime';
+      }
+      $('counter').textContent=`${String(current+1).padStart(2,'0')} / ${String(stages.length).padStart(2,'0')}`;
+      $('stage-name').textContent=stages[current];
+      $('prev').disabled=activeSlide===0&&current===0;
+      $('next').disabled=activeSlide===slides.length-1&&current===stages.length-1;
+      $('all').textContent=current===stages.length-1?'Restart':'Show all';
+      $('announcement').textContent=`Slide ${activeSlide+1} of ${slides.length}. Stage ${current+1} of ${stages.length}: ${stages[current]}`;
+      history.replaceState(null,'',activeSlide===0?`#${current+1}`:`#${activeSlide+1}-${current+1}`);
+    }
+    function advance(direction){
+      const next=current+direction;
+      if(next>=slides[activeSlide].stages.length&&activeSlide<slides.length-1)show(0,activeSlide+1);
+      else if(next<0&&activeSlide>0)show(slides[activeSlide-1].stages.length-1,activeSlide-1);
+      else show(next);
+    }
+    function fit(){document.documentElement.style.setProperty('--scale',Math.min(window.innerWidth/1600,window.innerHeight/900))}
+    async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen()}catch{}}
+    $('prev').onclick=()=>advance(-1);$('next').onclick=()=>advance(1);$('all').onclick=()=>{const last=slides[activeSlide].stages.length-1;show(current===last?0:last)};$('fullscreen').onclick=fullscreen;
+    document.querySelectorAll('.slide-tab').forEach(button=>button.onclick=()=>show(0,Number(button.dataset.slide)));
+    document.addEventListener('keydown',event=>{
+      if(event.altKey||event.ctrlKey||event.metaKey)return;
+      if(event.target.closest('button')&&(event.key===' '||event.key==='Enter'))return;
+      if(['ArrowRight','ArrowDown',' ','PageDown'].includes(event.key)){event.preventDefault();advance(1)}
+      else if(['ArrowLeft','ArrowUp','PageUp'].includes(event.key)){event.preventDefault();advance(-1)}
+      else if(event.key==='Home'){event.preventDefault();show(0)}
+      else if(event.key==='End'){event.preventDefault();show(slides[activeSlide].stages.length-1)}
+      else if(event.key.toLowerCase()==='f'){event.preventDefault();fullscreen()}
+    });
+    let downX=0,downY=0;document.querySelector('.deck').addEventListener('pointerdown',event=>{downX=event.clientX;downY=event.clientY});document.querySelector('.deck').addEventListener('click',event=>{if(event.button!==0||event.target.closest('button,a')||Math.abs(event.clientX-downX)>5||Math.abs(event.clientY-downY)>5||window.getSelection().toString())return;advance(1)});
+    let printStage=null;
+    window.addEventListener('beforeprint',()=>{if(printStage===null)printStage=[current,activeSlide];slides.forEach((slide,i)=>show(slide.stages.length-1,i))});
+    window.addEventListener('afterprint',()=>{if(printStage!==null){const previous=printStage;printStage=null;show(...previous)}});
+    function fromHash(){
+      const match=location.hash.match(/^#(?:(\d+)-)?(\d+)$/);
+      show(match?Number(match[2])-1:0,match&&match[1]?Number(match[1])-1:0);
+    }
+    window.addEventListener('hashchange',fromHash);window.addEventListener('resize',fit);fit();fromHash();
+  </script>
+</body>
+</html>
