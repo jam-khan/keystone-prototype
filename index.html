@@ -2,14 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#ffffff">
   <title>Keystone discussion</title>
   <style>
     :root{--paper:#ffffff;--ink:#24292f;--muted:#6b7280;--line:#e3e7ec;--teal:#1a5fb4;--teal-soft:#eef3fa;--amber:#9d621b;--amber-soft:#f6ead5;--kv:#66568a;--kv-soft:#f6f4f9;--scale:1}
     *{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--paper);color:var(--ink);font-family:Inter,"Aptos",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
     button{font:inherit;cursor:pointer}button:focus-visible,a:focus-visible{outline:3px solid var(--teal);outline-offset:4px}button:disabled{cursor:default;opacity:.3}
-    .deck{position:absolute;left:50%;top:50%;width:1600px;height:900px;transform:translate(-50%,-50%) scale(var(--scale));transform-origin:center;background:var(--paper);overflow:hidden}
+    .viewport{position:fixed;inset:0;overflow:hidden}
+    .deck{position:absolute;left:50%;top:calc((100% - var(--nav-height,0px))/2);width:1600px;height:900px;transform:translate(-50%,-50%) scale(var(--scale));transform-origin:center;background:var(--paper);overflow:hidden}
     .slide{position:absolute;inset:0;width:1600px;height:900px;overflow:hidden;background:var(--paper)}[hidden]{display:none!important}
     .masthead{position:absolute;left:72px;right:72px;top:28px;display:flex;justify-content:space-between;align-items:center;font-size:14px;font-weight:650;letter-spacing:2.1px;text-transform:uppercase;color:var(--muted)}
     .masthead strong{color:var(--teal);font-weight:750}.masthead .status{letter-spacing:1.1px;font-size:12px;display:flex;gap:9px;align-items:center}.status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--teal)}
@@ -56,10 +57,14 @@
     .wf-evaluation{position:absolute;left:72px;top:579px;width:1456px;height:88px;border:1px solid #c5d4e7;border-radius:7px;background:#f7f9fc;display:grid;grid-template-columns:270px repeat(4,1fr);align-items:center;padding:0 24px;gap:20px}.wf-evaluation h2{margin:0;font-size:22px;font-weight:550;color:var(--teal)}.wf-metric{border-left:1px solid #dbe2ec;padding-left:21px}.wf-metric b{display:block;font-size:17px;font-weight:550}
     .wf-example{position:absolute;left:72px;top:705px;width:1456px}.wf-example-title{margin:0 0 13px;font-size:13px;color:var(--muted);letter-spacing:.4px}.wf-example-title strong{font-weight:600;color:var(--ink)}.wf-increments{display:grid;grid-template-columns:448px 44px 448px 44px 472px;align-items:center}.wf-increment{height:91px;padding:14px 17px;border:1px solid var(--line);border-radius:6px;background:white}.wf-increment h3{margin:0;font-size:17px;font-weight:550}.wf-increment p{margin:11px 0 0;font-size:15px;color:var(--muted);white-space:nowrap}.wf-increment .wf-note{font-size:11px;font-weight:400;color:var(--muted);margin-left:9px}.wf-increment.property-step{border-color:#bdcfe5;background:#f7f9fc}.wf-increment.property-step h3{color:var(--teal)}.wf-step-arrow{text-align:center;color:#9aa6b5;font-size:23px}
     .sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
-    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}@media print{html,body{width:1600px;height:auto;overflow:visible}.deck{position:static;width:1600px;height:auto;transform:none;overflow:visible}.slide,.slide[hidden]{position:relative;display:block!important;break-after:page}.slide:last-of-type{break-after:auto}[data-show]{opacity:1;visibility:visible;transform:none}footer{display:none!important}@page{size:1600px 900px;margin:0}}
+    .mobile-nav{display:none;position:fixed;left:0;right:0;bottom:0;z-index:10;grid-template-columns:64px minmax(0,1fr) 64px;gap:12px;align-items:center;padding:12px max(16px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left));border-top:1px solid var(--line);background:var(--paper)}
+    .mobile-nav button{height:52px;border:1px solid #bdcde3;border-radius:8px;background:var(--teal-soft);color:var(--teal);font-size:30px;line-height:1;touch-action:manipulation}.mobile-nav span{text-align:center;font-size:13px;color:var(--muted)}
+    @media screen and (max-width:900px),screen and (pointer:coarse){footer{display:none}.mobile-nav{display:grid}}
+    @media(prefers-reduced-motion:reduce){*,*:before,*:after{transition:none!important;animation:none!important}}@media print{html,body{width:1600px;height:auto;overflow:visible}.viewport{position:static;overflow:visible}.deck{position:static;width:1600px;height:auto;transform:none;overflow:visible}.slide,.slide[hidden]{position:relative;display:block!important;break-after:page}.slide:last-of-type{break-after:auto}[data-show]{opacity:1;visibility:visible;transform:none}footer{display:none!important}@page{size:1600px 900px;margin:0}}
   </style>
 </head>
 <body>
+  <div class="viewport">
   <main class="deck" aria-label="Keystone discussion slides">
   <section class="slide" id="architecture" aria-label="Slide 1: Paged KV gather">
     <div class="masthead"><strong>Prototype</strong><span class="status">Lean 4</span></div>
@@ -194,6 +199,12 @@ checked uint64_t</div>
     <footer><nav class="slide-picker" aria-label="Slides"><button class="slide-tab" data-slide="0">1 · Gather</button><button class="slide-tab" data-slide="1">2 · Workflow</button></nav><div class="stage-label"><span class="stage-counter" id="counter">01 / 08</span><span id="stage-name">Gather</span></div><nav class="dots" aria-label="Reveal stages"></nav><div class="navigation"><button class="control arrow" id="prev" aria-label="Previous reveal">←</button><button class="control arrow primary" id="next" aria-label="Next reveal">→</button><button class="control" id="all">Show all</button><button class="control" id="fullscreen" aria-label="Toggle fullscreen">⛶</button></div></footer>
     <div class="sr-only" id="announcement" aria-live="polite"></div>
   </main>
+  </div>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Slide navigation">
+    <button id="mobile-prev" aria-label="Previous reveal">←</button>
+    <span id="mobile-position" aria-hidden="true">1 / 2 · Gather</span>
+    <button id="mobile-next" aria-label="Next reveal">→</button>
+  </nav>
   <script>
     const slides = [
       {id:'architecture', stages:['Gather', 'Thread model', 'Properties', 'Compile', 'C emission', 'KV · launch', 'KV · cancel', 'KV · finish']},
@@ -237,8 +248,9 @@ checked uint64_t</div>
       }
       $('counter').textContent=`${String(current+1).padStart(2,'0')} / ${String(stages.length).padStart(2,'0')}`;
       $('stage-name').textContent=stages[current];
-      $('prev').disabled=activeSlide===0&&current===0;
-      $('next').disabled=activeSlide===slides.length-1&&current===stages.length-1;
+      for(const id of ['prev','mobile-prev'])$(id).disabled=activeSlide===0&&current===0;
+      for(const id of ['next','mobile-next'])$(id).disabled=activeSlide===slides.length-1&&current===stages.length-1;
+      $('mobile-position').textContent=`${activeSlide+1} / ${slides.length} · ${stages[current]}`;
       $('all').textContent=current===stages.length-1?'Restart':'Show all';
       $('announcement').textContent=`Slide ${activeSlide+1} of ${slides.length}. Stage ${current+1} of ${stages.length}: ${stages[current]}`;
       history.replaceState(null,'',activeSlide===0?`#${current+1}`:`#${activeSlide+1}-${current+1}`);
@@ -249,9 +261,15 @@ checked uint64_t</div>
       else if(next<0&&activeSlide>0)show(slides[activeSlide-1].stages.length-1,activeSlide-1);
       else show(next);
     }
-    function fit(){document.documentElement.style.setProperty('--scale',Math.min(window.innerWidth/1600,window.innerHeight/900))}
+    function fit(){
+      const navHeight=$('mobile-nav').getBoundingClientRect().height;
+      const {clientWidth,clientHeight}=document.documentElement;
+      document.documentElement.style.setProperty('--nav-height',`${navHeight}px`);
+      document.documentElement.style.setProperty('--scale',Math.min(clientWidth/1600,(clientHeight-navHeight)/900));
+    }
     async function fullscreen(){try{if(document.fullscreenElement)await document.exitFullscreen();else if(document.documentElement.requestFullscreen)await document.documentElement.requestFullscreen()}catch{}}
     $('prev').onclick=()=>advance(-1);$('next').onclick=()=>advance(1);$('all').onclick=()=>{const last=slides[activeSlide].stages.length-1;show(current===last?0:last)};$('fullscreen').onclick=fullscreen;
+    $('mobile-prev').onclick=()=>advance(-1);$('mobile-next').onclick=()=>advance(1);
     document.querySelectorAll('.slide-tab').forEach(button=>button.onclick=()=>show(0,Number(button.dataset.slide)));
     document.addEventListener('keydown',event=>{
       if(event.altKey||event.ctrlKey||event.metaKey)return;
@@ -270,6 +288,7 @@ checked uint64_t</div>
       const match=location.hash.match(/^#(?:(\d+)-)?(\d+)$/);
       show(match?Number(match[2])-1:0,match&&match[1]?Number(match[1])-1:0);
     }
+    matchMedia('(max-width:900px), (pointer:coarse)').addEventListener('change',fit);
     window.addEventListener('hashchange',fromHash);window.addEventListener('resize',fit);fit();fromHash();
   </script>
 </body>
