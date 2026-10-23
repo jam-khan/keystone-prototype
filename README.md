@@ -16,7 +16,7 @@ are under `Keystone/`.
 | --- | --- |
 | `GPU/KVGather.lean` | Thread state, memory, instruction execution, and schedules |
 | `GPU/Properties.lean` | The five kernel guarantees; consult `Auxiliary.lean` for their proofs |
-| `Compile/IR.lean` | Primitive register operations and their independent interpreter |
+| `Compile/Target.lean` | Primitive register operations and their independent interpreter |
 | `Compile/Compiler.lean` | How each existing GPU instruction becomes a target block |
 | `Compile/Correctness.lean` | Step equivalence, schedule equivalence, and inherited guarantees |
 | `Compile/Examples.lean` | Checked runs, faults, starvation, and a compiler mutation |

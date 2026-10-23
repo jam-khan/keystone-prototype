@@ -1,4 +1,4 @@
-import Keystone.Compile.IR
+import Keystone.Compile.Target
 
 namespace Keystone.Compile
 

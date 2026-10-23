@@ -77,7 +77,8 @@ structure Thread where
   State of the whole running kernel: every thread's state, plus the output buffer.
 -/
 structure KernelState where
-  threads : Nat → Thread        -- mapping from thread ID to its state
+  -- mapping from thread ID to its state
+  threads : Nat → Thread
   -- tries to find output at that position
   -- initially, output 0 = none and then thread 0 stores, so output 0 = some 30
   output  : Nat → Option UInt32
