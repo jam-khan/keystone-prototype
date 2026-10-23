@@ -3,3 +3,5 @@ docs/
 artifacts/
 __pycache__/
 .DS_Store
+Keystone/GPU/Notes.lean
+/architecture-slide/

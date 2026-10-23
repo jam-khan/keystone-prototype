@@ -1,96 +1,98 @@
-# Keystone: build it gradually
+# Keystone: GPU model and compilation
 
-`main` is your working implementation. `prototype-1` holds the completed reference.
-This branch starts with Lean 4.34.1, an empty GPU module, and no external packages.
-
-## Start
+`main` contains your grid-stride KV gather, its proofs, and a compiler for that
+same kernel. `prototype-1` remains an older reference; its separate lowering
+language is not the starting point here. Lean is pinned in `lean-toolchain`.
 
 ```sh
-make check                            # builds; warnings fail the check
-lake env lean Keystone/GPU/Model.lean  # check the file you are editing
-git show prototype-1:Keystone/GPU/Model.lean  # read the reference without switching
+make check                                      # build everything; warnings fail
+lake env lean Keystone/Compile/Compiler.lean     # check the file you are reading
 ```
 
-Open the repository root in your Lean editor. Start in `Keystone/GPU/Model.lean`.
-As you add modules, import them from `Keystone.lean` so `make check` checks them.
-The scaffold is ready for your first commit; nothing has been staged or committed.
+Open the repository root in your Lean editor. Read in this order; paths below
+are under `Keystone/`.
 
-## Milestones
+| File | What to understand |
+| --- | --- |
+| `GPU/KVGather.lean` | Thread state, memory, instruction execution, and schedules |
+| `GPU/Properties.lean` | The five kernel guarantees; consult `Auxiliary.lean` for their proofs |
+| `Compile/IR.lean` | Primitive register operations and their independent interpreter |
+| `Compile/Compiler.lean` | How each existing GPU instruction becomes a target block |
+| `Compile/Correctness.lean` | Step equivalence, schedule equivalence, and inherited guarantees |
+| `Compile/Examples.lean` | Checked runs, faults, starvation, and a compiler mutation |
+| `Compile/Emit.lean` | Trusted C serialization of those same compiled blocks |
 
-Paths below are under `Keystone/`. Each milestone can be several small commits.
-Use `prototype-1` to look up a definition or lemma when stuck, then explain it in
-your own words before incorporating it.
+## What connects the two layers
 
-1. **Specify paged gather — `GPU/Model.lean`.** Define `Config`, `Input`,
-   `referenceAt`, and `reference`: `out[t] = cache[table[t / B] * B + t % B]`.
-   **Done:** with `B=2`, `n=5`, `lanes=8`, table `#[2,0,1]`, and cache
-   `#[10,11,20,21,30,31]`, a checked example returns `#[30,31,10,11,20]`.
+`Compile` imports the GPU model and uses its `Config`, `KVMemory`, `Thread`,
+`KernelState`, `Access`, and `Fault` directly. It adds one temporary register.
+The source program is the existing `GPU.Instr` stages; the compiler expands each
+stage into arithmetic, checked reads/writes, and a branch or jump.
 
-2. **Execute instructions — `GPU/Model.lean`.** Add lane state, program counters,
-   accesses, faults, `step`, and a schedule-driven `run`.
-   **Done:** a complete schedule matches the specification; a starved lane stays
-   incomplete; removing the mask or using the wrong page index exposes a failure.
+For example, `.page` becomes:
 
-3. **Prove safety and values — `GPU/Auxiliary.lean`, `GPU/Properties.lean`.** State `ValidInput` in the model;
-   build `LaneOK` and `Invariant`, then `table_bounds`, `cache_bounds`, `step_safe`,
-   `run_safe`, and `completed_execution_correct`.
-   **Done:** explain why each memory access is bounded and why completed outputs
-   match the specification for any schedule containing valid lane IDs.
+```text
+temp        = round * numThreads
+temp        = threadId + temp
+logicalPage = temp / pageSize
+jump to .table
+```
 
-4. **Prove completion — `GPU/Auxiliary.lean`, `GPU/Properties.lean`.** Track instructions remaining;
-   prove `sufficiently_scheduled_finishes`, then `verified_roundRobin`.
-   **Done:** six turns per lane suffice; explain why safety alone permits starvation.
+The target interpreter executes these operations without calling `GPU.step`.
+`step_eq` proves the block has exactly that GPU instruction's effect, including
+faults, for arbitrary states and configurations. It converts the source's optional
+access into a list. `run_eq` extends equality to every supplied schedule: the
+complete kernel state, access trace, and fault result agree.
 
-5. **Model page lifetimes — `KV/Controller.lean`, `KV/Examples.lean`.** Implement
-   leases, tickets, allocation, submission, retirement, and completion.
-   **Done:** retire A with two readers pending; B cannot reuse A's page after just
-   one completion, can after both, and a stale A completion cannot disturb B.
+Consequently, the GPU proofs also establish target memory safety, completed-output
+correctness, distinct stores, completion under sufficient scheduling, and verified
+round-robin execution. Those properties retain their original assumptions.
 
-6. **Prove lifetime safety — `KV/Controller.lean`, `KV/Lifetime.lean`.** Establish
-   `Valid` and preservation per command, then `run_valid`, `lifetime_safety`,
-   non-reappearance of completed tickets/reclaimed leases, and final reclamation.
-   **Done:** these claims hold for arbitrary histories; identify the assumptions
-   about completion signals, request IDs, and writes to pending pages.
+## Concrete milestones
 
-7. **Build a compiler — `Lowering/Language.lean`, `Lowering/Compiler.lean`.** Define
-   structured source commands and a separate flat stack interpreter. Compile
-   expressions to postfix instructions and guards to balanced predicate regions.
-   **Done:** nested guards skip invalid reads and restore the enclosing predicate;
-   source and target agree on output, access trace, and a fault's partial state.
+1. **Trace the source loop.** With 8 tokens and 5 threads, explain why thread 0
+   handles tokens 0 and 5. Follow `.store` back to `.guard`; explain why padded
+   threads stop without memory accesses. Check `GPU/Examples.lean`.
+2. **Read the claims before their helpers.** Explain `ValidLaunch`, the invariant,
+   and why completion needs scheduling. The sufficient bound is
+   `6 * numRounds cfg + 1` turns per thread, not a fixed six turns.
+3. **Trace a compiled block.** Follow `.page`, then `.kvIndex`, then `.store`.
+   Predict every register, next GPU stage, and memory access before evaluating it.
+4. **Follow the proof connection.** Read `step_eq`, then the schedule induction
+   in `run_eq`. Pick one transferred GPU property and explain the rewrite.
+5. **Break only the compiled syntax.** The example replaces division with remainder
+   in the `.page` block. Observe the disagreement while leaving the interpreter
+   and expected behavior unchanged.
 
-8. **Prove the compiler — `Lowering/Proofs.lean`.** Start with `target_append` and
-   `compileExpr_correct`; handle inactive execution, then prove `compile_correct`.
-   **Done:** correctness holds for every source command and arbitrary caller stack
-   and mask frames, including faults. A few equal example outputs are insufficient.
+Work one definition or lemma at a time: predict, edit, run `make check`, then
+commit when you can explain the change. Import new modules from `Keystone.lean`.
 
-9. **Connect the models — `Lowering/Gather.lean`, `Composition.lean`.** Encode the
-   gather, establish word-size bounds, derive its memory contract from live leases,
-   and prove `pending_lowered_gather_correct`.
-   **Done:** trace each premise from a pending ticket to the lowered result;
-   distinguish retaining an allocation from preserving its contents.
+## Scope and later steps
 
-10. **Run native code — `Lowering/Emit.lean`, then `CLI/` and `experiments/`.** Add
-    C emission and a small runner; compare specification, both interpreters, and
-    native output. Add focused regressions, an axiom audit, and CI as needed.
-    **Done:** explain exactly where the proof ends. CUDA is an optional later step
-    requiring hardware validation; emitted C/CUDA and drivers remain trusted.
+Each scheduled turn executes one complete target block. Jumps select the block
+for that thread's next turn. The proof covers these block boundaries; it does not
+cover arbitrary interleavings of operations inside a block. The proved model uses
+`Nat` indices and `UInt32` payloads.
 
-## Working rhythm
+`Emit.lean` serializes the compiled blocks into C99. `kg_run` replays an explicit
+thread schedule on the CPU. Its `uint64_t` arithmetic rejects overflow; buffers
+must have their declared lengths, inputs remain immutable and separate from
+output, and thread/output state starts at zero. On error, discard state and trace.
+Serialization, machine-width arithmetic, and the C compiler/runtime are trusted;
+there is no emitted-C theorem or CUDA execution claim.
 
-Predict one example, implement one definition or lemma, then run `make check` and
-commit that increment. Use `#eval` to inspect execution and `example ... := by decide`
-for finite checked examples. State general properties as theorems; keep committed
-proofs free of `sorry`. Suggested first commit: `chore: bootstrap Lean project`.
+```sh
+lake exe emit_c > /tmp/keystone.c
+cc -std=c99 -Wall -Wextra -Werror -c /tmp/keystone.c -o /tmp/keystone.o
+lake exe emit_c --oracle  # source-model fixtures for native comparison
+```
 
-## Questions to carry into the interview
+Next milestones: prove a machine-integer refinement or validate emitted code;
+connect **KV lifetimes** to the kernel's assumption that pages remain unchanged.
 
-- **GPU semantics:** what semantic level should Keystone verify first, and which
-  concurrency features—barriers, atomics, shared memory—are essential?
-- **Runtime:** what event establishes that a cancelled request's pages are safe
-  to reclaim across streams? Where should that obligation meet the driver API?
-- **Extraction:** what should connect proved IR semantics to deployed kernels:
-  a verified backend, translation validation, or a deliberately trusted compiler?
+Questions to explore: which scheduling granularity should a GPU semantics expose?
+What completion event permits page reclamation? Should the final backend be
+verified, translation-validated, or deliberately trusted?
 
-These experiments target the JD's kernel semantics, runtime glue, verified
-artifacts, and trusted computing base. They are models for discussion, not a claim
-that Keystone has chosen this architecture.
+[Architecture slide](architecture-slide/dist/index.html) is local only.
+Open it in a browser; click or press → to reveal.

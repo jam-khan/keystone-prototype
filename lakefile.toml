@@ -1,6 +1,10 @@
 name = "keystone"
 version = "0.1.0"
-defaultTargets = ["Keystone"]
+defaultTargets = ["Keystone", "emit_c"]
 
 [[lean_lib]]
 name = "Keystone"
+
+[[lean_exe]]
+name = "emit_c"
+root = "EmitMain"

@@ -1,6 +1,6 @@
 import Keystone.GPU.KVGather
 
-namespace Keystone.Lowering
+namespace Keystone.Compile
 
 /-- Existing thread registers, plus one temporary used inside a compiled block. -/
 inductive Register where
@@ -104,4 +104,4 @@ def executeBlock (cfg : GPU.Config) (mem : GPU.KVMemory) (tid : Nat) :
     let (last, accesses) ← executeBlock cfg mem tid rest next
     return (last, access.toList ++ accesses)
 
-end Keystone.Lowering
+end Keystone.Compile
