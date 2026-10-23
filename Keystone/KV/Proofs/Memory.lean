@@ -1,7 +1,7 @@
 import Keystone.GPU.KVGather -- GPU memory, launch conditions, and source execution.
-import Keystone.GPU.Auxiliary -- Invariant, ThreadOK, and step_safe.
+import Keystone.GPU.Proofs.Kernel -- Invariant, ThreadOK, and step_safe.
 import Keystone.Compile.Compiler -- Compiled step/run.
-import Keystone.Compile.Correctness -- step_eq connects compiled and source execution.
+import Keystone.Compile.Properties -- step_eq connects compiled and source execution.
 import Keystone.KV.Manager -- Leases, tickets, and ownership invariants.
 import Keystone.KV.Runtime -- Ticket.memory and fillPage.
 

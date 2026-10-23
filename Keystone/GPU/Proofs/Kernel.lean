@@ -1,7 +1,7 @@
 import Keystone.GPU.KVGather -- Kernel state, execution, and launch conditions.
 
 /-!
-# Auxiliary: proof infrastructure for `Properties.lean`
+# Supporting proofs for `Properties.lean`
 
 1. Bounds and grid-stride arithmetic.
 2. The invariant every reachable state satisfies (`ThreadOK`, `Filled`, `Invariant`),
@@ -11,6 +11,13 @@ import Keystone.GPU.KVGather -- Kernel state, execution, and launch conditions.
 -/
 
 namespace Keystone.GPU
+
+@[simp] theorem validateLaunch_eq_true :
+    validateLaunch cfg mem = true ↔ ValidLaunch cfg mem := by
+  simp [validateLaunch]
+
+@[simp] theorem completed_eq_true : completed cfg s = true ↔ Finished cfg s := by
+  simp [completed, Finished, List.all_eq_true]
 
 /-! ## Bounds: a valid launch keeps both reads in bounds -/
 
@@ -262,6 +269,15 @@ theorem step_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
     · exact store_invariant hinv ht hi'.2
   | done =>
     exact ⟨s, none, by simp [step, Nat.not_le_of_gt ht, hp] <;> rfl, hinv⟩
+
+-- `step` checks each bound before it accesses, so any access it returns is in bounds
+theorem step_access_safe (ht : tid < cfg.numThreads)
+    (hs : step cfg mem tid s = .ok (next, some a)) : AccessSafe cfg mem a := by
+  cases hp : (s.threads tid).instr <;>
+    simp [step, Nat.not_le_of_gt ht, hp] at hs
+  all_goals try split at hs
+  all_goals try cases hs
+  all_goals simp_all [AccessSafe]
 
 -- once every thread is done, every output slot holds the expected entry
 theorem finished_correct (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)

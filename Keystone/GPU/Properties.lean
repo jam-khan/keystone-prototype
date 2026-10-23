@@ -1,39 +1,12 @@
 import Keystone.GPU.KVGather -- Kernel model and schedules.
-import Keystone.GPU.Auxiliary -- Invariant and supporting proofs.
+import Keystone.GPU.Proofs.Kernel -- Invariant and supporting proofs.
 
-/-!
-# Properties: what is proved about the KV gather
-
-1. `run_safe`: on a valid launch, any schedule of launched threads runs without
-   faulting, so every access is in bounds.
-2. `completed_execution_correct`: once every thread is done, output = `expectedOutput`.
-3. `run_stores_distinct`: no output slot is written twice, so no two writes race.
-4. `sufficiently_scheduled_finishes`: `6 * numRounds + 1` turns per thread finish every thread.
-5. `verified_roundRobin`: on a valid launch, `roundRobin` runs safely, finishes,
-   and outputs `expectedOutput`.
-
-The invariant (`ThreadOK`, `Invariant`) and the helper lemmas are in `Auxiliary.lean`.
--/
+/-! Main guarantees: safety, correct output, distinct stores, and completion.
+Supporting invariants and proofs are in Proofs/Kernel.lean. -/
 
 namespace Keystone.GPU
 
 /-! ## Safety: no step faults, every access is in bounds -/
-
-/-- An access is inside the buffer it touches. -/
-def AccessSafe (cfg : Config) (mem : KVMemory) (a : Access) : Prop :=
-  match a.buffer with
-  | .pageTable => a.index < mem.pageTable.size
-  | .kvCache   => a.index < mem.kvCache.size
-  | .output    => a.index < cfg.numTokens
-
--- `step` checks each bound before it accesses, so any access it returns is in bounds
-private theorem step_access_safe (ht : tid < cfg.numThreads)
-    (hs : step cfg mem tid s = .ok (next, some a)) : AccessSafe cfg mem a := by
-  cases hp : (s.threads tid).instr <;>
-    simp [step, Nat.not_le_of_gt ht, hp] at hs
-  all_goals try split at hs
-  all_goals try cases hs
-  all_goals simp_all [AccessSafe]
 
 /-- Any schedule of launched threads runs without faulting, so every access is in bounds.
 It need not finish. -/
@@ -66,13 +39,6 @@ theorem run_safe (hvalid : ValidLaunch cfg mem) (hinv : Invariant cfg mem s)
       · exact has a hright
 
 /-! ## Correctness: a finished run produces the expected output -/
-
-/-- Every launched thread is at `.done`. -/
-def Finished (cfg : Config) (s : KernelState) : Prop :=
-  ∀ tid, tid < cfg.numThreads → (s.threads tid).instr = .done
-
-@[simp] theorem completed_eq_true : completed cfg s = true ↔ Finished cfg s := by
-  simp [completed, Finished, List.all_eq_true]
 
 /-- For ANY schedule that finishes: output matches the spec, and every access was safe. -/
 theorem completed_execution_correct (hvalid : ValidLaunch cfg mem)

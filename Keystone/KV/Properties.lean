@@ -1,7 +1,7 @@
-import Keystone.GPU.KVGather -- Source execution and expected gather output.
-import Keystone.GPU.Properties -- run_safe and AccessSafe.
+import Keystone.GPU.KVGather -- Source execution, expected gather output, and AccessSafe.
+import Keystone.GPU.Properties -- run_safe.
 import Keystone.Compile.Compiler -- Compile.run executes the live-pool chunk.
-import Keystone.Compile.Correctness -- run_eq connects compiled and source runs.
+import Keystone.Compile.Properties -- run_eq connects compiled and source runs.
 import Keystone.KV.Manager -- Leases, tickets, manager validity, and histories.
 import Keystone.KV.Runtime -- Connected allocation, execution, and completion.
 import Keystone.KV.Proofs.Manager -- Lease retention and manager preservation.

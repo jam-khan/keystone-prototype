@@ -115,6 +115,13 @@ structure Access where
   index     : Nat
   deriving Repr, DecidableEq
 
+/-- An access is inside the buffer it touches. -/
+def AccessSafe (cfg : Config) (mem : KVMemory) (a : Access) : Prop :=
+  match a.buffer with
+  | .pageTable => a.index < mem.pageTable.size
+  | .kvCache   => a.index < mem.kvCache.size
+  | .output    => a.index < cfg.numTokens
+
 /--
   Fault is an invalid operation during kernel execution
 -/
@@ -216,6 +223,10 @@ def roundRobin (cfg : Config) : List Nat :=
 def completed (cfg : Config) (s : KernelState) : Bool :=
   (List.range cfg.numThreads).all (fun t => (s.threads t).instr == .done)
 
+/-- Every launched thread is at `.done`. -/
+def Finished (cfg : Config) (s : KernelState) : Prop :=
+  ∀ tid, tid < cfg.numThreads → (s.threads tid).instr = .done
+
 def outputEntries (cfg : Config) (s : KernelState) : Array (Option UInt32) :=
   Array.ofFn (fun t : Fin cfg.numTokens => s.output t)
 
@@ -243,9 +254,5 @@ instance (cfg : Config) (mem : KVMemory) : Decidable (ValidLaunch cfg mem) :=
   inferInstanceAs (Decidable (_ ∧ _ ∧ _ ∧ ∀ _p : Fin mem.pageTable.size, _))
 
 def validateLaunch (cfg : Config) (mem : KVMemory) : Bool := decide (ValidLaunch cfg mem)
-
-@[simp] theorem validateLaunch_eq_true :
-    validateLaunch cfg mem = true ↔ ValidLaunch cfg mem := by
-  simp [validateLaunch]
 
 end Keystone.GPU

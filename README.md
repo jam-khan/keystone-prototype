@@ -20,22 +20,26 @@ modules by layer.
 | File | What to understand |
 | --- | --- |
 | `GPU/KVGather.lean` | Thread state, memory, instruction execution, and schedules |
-| `GPU/Properties.lean` | The five kernel guarantees; consult `Auxiliary.lean` for their proofs |
+| `GPU/Examples.lean` | Concrete gathers, padding, interleavings, and faults |
+| `GPU/Properties.lean` | The five kernel guarantees |
 | `Compile/Target.lean` | Primitive register operations and their independent interpreter |
 | `Compile/Compiler.lean` | How each existing GPU instruction becomes a target block |
-| `Compile/Correctness.lean` | Step equivalence, schedule equivalence, and inherited guarantees |
 | `Compile/Examples.lean` | Checked runs, faults, starvation, and a compiler mutation |
+| `Compile/Properties.lean` | Step equivalence, schedule equivalence, and inherited guarantees |
 | `Compile/Emit.lean` | Trusted C serialization of those same compiled blocks |
 | `KV/Manager.lean` | Leases, pending tickets, allocation, cancellation, and reclamation |
 | `KV/Runtime.lean` | Leases → GPU page table → `Compile.run` → checked completion |
 | `KV/Examples.lean` | Page order, cancellation during a read, reuse, and an injected bug |
 | `KV/Properties.lean` | Main guarantees: page lifetime, safe execution, and correct output |
 
-For KV, those four files are the reading path. Skip `KV/Proofs/` initially:
-`Manager.lean` contains the manager lemmas, `Memory.lean` relates the live cache to
-the launch snapshot, and `Runtime.lean` defines the runtime invariant and proves
-that operations preserve it. `Runtime` itself imports the GPU model and compiler
-directly; it does not depend on these proof files.
+Each layer keeps its main guarantees in `Properties.lean`. Skip `Proofs/` initially:
+
+- `GPU/Proofs/Kernel.lean`: invariants, bounds, distinct stores, and scheduling lemmas.
+- `Compile/Proofs/Compiler.lean`: case analysis for executing compiled blocks.
+- `KV/Proofs/`: manager preservation, memory agreement, and runtime invariants.
+
+The executable model, compiler, and runtime do not import proof files. In particular,
+`KV/Runtime.lean` imports the GPU model and compiler directly.
 
 ## What connects the layers
 
@@ -87,7 +91,8 @@ unfinished kernel actually reading another request's replacement data.
 3. **Trace a compiled block.** Follow `.page`, then `.kvIndex`, then `.store`.
    Predict every register, next GPU stage, and memory access before evaluating it.
 4. **Follow the proof connection.** Read `step_eq`, then the schedule induction
-   in `run_eq`. Pick one transferred GPU property and explain the rewrite.
+   in `run_eq`, both in `Compile/Properties.lean`. Pick one transferred GPU property
+   and explain the rewrite.
 5. **Break only the compiled syntax.** The example replaces division with remainder
    in the `.page` block. Observe the disagreement while leaving the interpreter
    and expected behavior unchanged.

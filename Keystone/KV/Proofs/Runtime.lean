@@ -1,6 +1,5 @@
 import Keystone.GPU.KVGather -- GPU launch, memory, state, and completion.
-import Keystone.GPU.Auxiliary -- Invariant, initial_invariant, and finished_correct.
-import Keystone.GPU.Properties -- completed_eq_true.
+import Keystone.GPU.Proofs.Kernel -- Invariant, initial_invariant, finished_correct, completed_eq_true.
 import Keystone.KV.Manager -- Manager state and page-lifetime operations.
 import Keystone.KV.Runtime -- Shared pool and connected kernel operations.
 import Keystone.KV.Proofs.Manager -- Manager preservation and complete_pending.

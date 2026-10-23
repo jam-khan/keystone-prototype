@@ -1,8 +1,8 @@
 import Keystone.GPU.KVGather -- Source step/run and kernel state.
-import Keystone.GPU.Auxiliary -- GPU.Invariant.
+import Keystone.GPU.Proofs.Kernel -- GPU.Invariant used by run_safe.
 import Keystone.GPU.Properties -- The five GPU guarantees being transferred.
-import Keystone.Compile.Target -- Target interpreter definitions used in step_eq.
-import Keystone.Compile.Compiler -- compile, computeToken, and compiled step/run.
+import Keystone.Compile.Compiler -- Compiled step/run.
+import Keystone.Compile.Proofs.Compiler -- Each selected block executes its source stage.
 
 namespace Keystone.Compile
 
@@ -18,16 +18,8 @@ theorem step_eq
       (fun (next, access) => (next, access.toList)) := by
   by_cases ht : tid ≥ cfg.numThreads
   · simp [step, GPU.step, ht] <;> rfl
-  · simp only [step, GPU.step, ite_eq_right ht]
-    by_cases htable : (s.threads tid).logicalPage ≥ mem.pageTable.size <;>
-      by_cases hcache : (s.threads tid).kvIndex ≥ mem.kvCache.size <;>
-      by_cases houtput : tid + (s.threads tid).round * cfg.numThreads ≥ cfg.numTokens <;>
-      cases hp : (s.threads tid).instr <;>
-      simp +contextual [htable, hcache, houtput, hp, compile, computeToken, executeBlock,
-        executeInstruction, operandValue, readRegister, writeRegister,
-        arithmeticValue, jump, GPU.token, GPU.physicalPage,
-        GPU.withThread, GPU.withOutput, Bind.bind, Pure.pure,
-        Except.bind, Except.map, Except.pure] <;> rfl
+  · simpa only [step, ite_eq_right ht] using
+      execute_compiled_block cfg mem tid s (Nat.lt_of_not_ge ht)
 
 /-- Every schedule produces the same full state, access trace, or fault. -/
 theorem run_eq
