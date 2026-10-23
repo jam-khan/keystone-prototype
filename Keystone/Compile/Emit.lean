@@ -3,34 +3,48 @@ import Keystone.Compile.Compiler
 namespace Keystone.Compile
 
 private def stageNumber : GPU.Instr → Nat
-  | .guard => 0 | .page => 1 | .table => 2 | .kvIndex => 3
-  | .load => 4 | .store => 5 | .done => 6
+  | .guard    => 0
+  | .page     => 1
+  | .table    => 2
+  | .kvIndex  => 3
+  | .load     => 4
+  | .store    => 5
+  | .done     => 6
 
 private def registerC : Register → String
-  | .round => "t->round" | .logicalPage => "t->logical_page"
-  | .physicalPage => "t->physical_page" | .kvIndex => "t->kv_index" | .temp => "temp"
+  | .round        => "t->round"
+  | .logicalPage  => "t->logical_page"
+  | .physicalPage => "t->physical_page"
+  | .kvIndex      => "t->kv_index"
+  | .temp         => "temp"
 
 private def operandC : Operand → String
-  | .constant value => s!"UINT64_C({value})"
-  | .threadId => "tid" | .numTokens => "cfg.num_tokens"
-  | .pageSize => "cfg.page_size" | .numThreads => "cfg.num_threads"
-  | .register reg => registerC reg
+  | .constant value   => s!"UINT64_C({value})"
+  | .threadId         => "tid"
+  | .numTokens        => "cfg.num_tokens"
+  | .pageSize         => "cfg.page_size"
+  | .numThreads       => "cfg.num_threads"
+  | .register reg     => registerC reg
 
 private def accessC (buffer : Nat) (index bound action : String) : String :=
-  s!"index = {index};\n" ++
-  "*access = (KgAccess){tid, " ++ s!"{buffer}, index" ++ "};\n" ++
-  s!"if (index >= {bound}) " ++ "{ fault->access = *access; return KG_OUT_OF_BOUNDS; }\n" ++
-  s!"{action}\n*has_access = 1;\n"
+      s!"index = {index};\n"
+  ++  "*access = (KgAccess){tid, " ++ s!"{buffer}, index" ++ "};\n"
+  ++  s!"if (index >= {bound}) " ++ "{ fault->access = *access; return KG_OUT_OF_BOUNDS; }\n"
+  ++  s!"{action}\n*has_access = 1;\n"
 
 private def instructionC : Instruction → String
   | .binary op dest lhs rhs =>
       let operation := match op with
-        | .add => "if (b > UINT64_MAX - a) return KG_OVERFLOW;\n" ++
-            s!"{registerC dest} = a + b;\n"
-        | .mul => "if (b != 0 && a > UINT64_MAX / b) return KG_OVERFLOW;\n" ++
-            s!"{registerC dest} = a * b;\n"
-        | .div => s!"{registerC dest} = b == 0 ? 0 : a / b;\n"
-        | .mod => s!"{registerC dest} = b == 0 ? a : a % b;\n"
+        | .add =>
+          "if (b > UINT64_MAX - a) return KG_OVERFLOW;\n"
+          ++  s!"{registerC dest} = a + b;\n"
+        | .mul =>
+          "if (b != 0 && a > UINT64_MAX / b) return KG_OVERFLOW;\n"
+          ++  s!"{registerC dest} = a * b;\n"
+        | .div =>
+          s!"{registerC dest} = b == 0 ? 0 : a / b;\n"
+        | .mod =>
+          s!"{registerC dest} = b == 0 ? a : a % b;\n"
       s!"a = {operandC lhs}; b = {operandC rhs};\n" ++ operation
   | .readPageTable dest index =>
       accessC 0 (operandC index) "mem.page_table_size"
